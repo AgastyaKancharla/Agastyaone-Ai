@@ -14,18 +14,23 @@ export class BrowserFactory {
     }
 
     console.log('🚀 Launching Self-Hosted Container Chromium...');
-    const browser = await chromium.launch({
-      headless: CONFIG.HEADLESS,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ]
-    });
-    return { browser };
+    try {
+      const browser = await chromium.launch({
+        headless: CONFIG.HEADLESS,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      });
+      return { browser };
+    } catch (err: any) {
+      console.warn('⚠️ Chromium launch failed:', err.message);
+      throw new Error(`Browser engine error: ${err.message || 'Chromium binary unavailable in environment'}`);
+    }
   }
 }

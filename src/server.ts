@@ -1007,11 +1007,13 @@ app.get('/', (req: Request, res: Response) => {
   res.send(getDashboardHTML());
 });
 
-app.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`🌐 Nexus Suite Command Center is running!`);
-  console.log(`📍 Main Dashboard: http://localhost:${PORT}`);
-  console.log(`======================================================\n`);
-});
+if (!process.env.VERCEL && !process.env.NOW_REGION) {
+  app.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`🌐 Nexus Suite Command Center is running!`);
+    console.log(`📍 Main Dashboard: http://localhost:${PORT}`);
+    console.log(`======================================================\n`);
+  });
+}
 
 export default app;
