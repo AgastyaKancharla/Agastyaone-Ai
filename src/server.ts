@@ -1,0 +1,644 @@
+import express, { Request, Response } from 'express';
+import path from 'path';
+import { CitationAuditAgent } from './index';
+import { SourceOfTruthNAP } from './types/nap';
+import { NAPReporter } from './reports/reporter';
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// API Endpoint to execute NAP audit
+app.post('/api/audit', async (req: Request, res: Response) => {
+  try {
+    const { businessName, address, city, pincode, phone, category, website } = req.body;
+
+    if (!businessName || !address || !phone) {
+      return res.status(400).json({ error: 'businessName, address, and phone are required fields.' });
+    }
+
+    const sourceNAP: SourceOfTruthNAP = {
+      businessName,
+      address,
+      city: city || 'Bengaluru',
+      pincode: pincode || '',
+      phone,
+      category: category || 'Dental Clinic',
+      website: website || ''
+    };
+
+    console.log(`\n🚀 Web API Request: Starting audit for "${businessName}"...`);
+    const agent = new CitationAuditAgent();
+    const report = await agent.runAudit(sourceNAP);
+    const markdownReport = NAPReporter.generateMarkdownReport(report);
+
+    return res.json({
+      success: true,
+      report,
+      markdownReport
+    });
+  } catch (error: any) {
+    console.error('Audit execution error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve the Single Page Web Dashboard
+app.get('/', (req: Request, res: Response) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Citation & NAP Audit Agent | Self-Hosted Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #090d16 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --consistent: #10b981;
+      --drift: #f59e0b;
+      --inconsistent: #ef4444;
+      --notfound: #6b7280;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 50%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .badge-cloud {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.8rem;
+      border-radius: 9999px;
+      margin-top: 0.75rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      margin-bottom: 2rem;
+    }
+
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 1.5rem;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 25px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Loading Overlay */
+    .loading-state {
+      display: none;
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-left-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Results Dashboard */
+    .results-container {
+      display: none;
+    }
+
+    .score-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1.5rem 2rem;
+      border-radius: 16px;
+      margin-bottom: 2rem;
+    }
+
+    .score-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: conic-gradient(var(--accent) calc(var(--score) * 1%), rgba(255,255,255,0.1) 0deg);
+      position: relative;
+    }
+
+    .score-circle-inner {
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-num {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+    }
+
+    .score-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      flex: 1;
+    }
+
+    .stat-box {
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .stat-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Directory Card list */
+    .dir-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .dir-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .dir-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.3rem 0.75rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+
+    .badge-CONSISTENT { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-DRIFT { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-INCONSISTENT { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-NOT_FOUND { background: rgba(107, 114, 128, 0.2); color: #9ca3af; border: 1px solid rgba(107, 114, 128, 0.4); }
+
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .diff-table th, .diff-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .diff-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+
+    }
+
+    .match-icon {
+      font-weight: bold;
+    }
+    .match-EXACT { color: #34d399; }
+    .match-DRIFT { color: #fbbf24; }
+    .match-MISMATCH { color: #f87171; }
+    .match-MISSING { color: #9ca3af; }
+
+    .action-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .score-banner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Local Citation & NAP Audit Agent</h1>
+    <p>100% Self-Hosted Automated Directory Scraper & diffing engine</p>
+    <div class="badge-cloud">⚡ Built-in Chromium Scraper | Justdial • Practo • Sulekha • Google</div>
+  </header>
+
+  <!-- Input Form -->
+  <div class="card" id="formCard">
+    <div class="card-title">📍 Business Source-of-Truth Details</div>
+    <form id="auditForm">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Business Name *</label>
+          <input type="text" id="businessName" value="Nissa Dental Clinic & Implant Center" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <input type="text" id="category" value="Dental Clinic">
+        </div>
+        <div class="form-group">
+          <label>Street Address *</label>
+          <input type="text" id="address" value="No. 45, 100 Feet Road, 4th Block, Koramangala" required>
+        </div>
+        <div class="form-group">
+          <label>City *</label>
+          <input type="text" id="city" value="Bengaluru" required>
+        </div>
+        <div class="form-group">
+          <label>Pincode</label>
+          <input type="text" id="pincode" value="560034">
+        </div>
+        <div class="form-group">
+          <label>Phone Number *</label>
+          <input type="text" id="phone" value="08098765432" required>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Website URL</label>
+          <input type="url" id="website" value="https://nissadental.com">
+        </div>
+      </div>
+      <button type="submit" class="btn-submit" id="submitBtn">
+        <span>🔍 Run Comprehensive NAP Audit</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Loading State -->
+  <div class="card loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <h3 style="font-family: 'Outfit'; font-size: 1.4rem; margin-bottom: 0.5rem;">Auditing Indian Local Directories...</h3>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">Launching Playwright headless Chromium worker to scan Justdial, Practo, Sulekha, and Google Business Profile.</p>
+  </div>
+
+  <!-- Results Dashboard -->
+  <div class="results-container" id="resultsContainer">
+    <div class="card">
+      <div class="score-banner">
+        <div class="score-circle" id="scoreCircle" style="--score: 85;">
+          <div class="score-circle-inner">
+            <span class="score-num" id="scoreValue">85%</span>
+            <span class="score-label">NAP Score</span>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="statChecked">0</div>
+            <div class="stat-title">Directories Checked</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" style="color: var(--consistent);" id="statConsistent">0</div>
+            <div class="stat-title">Consistent</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" style="color: var(--drift);" id="statInconsistent">0</div>
+            <div class="stat-title">Drift / Inconsistent</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" style="color: var(--notfound);" id="statMissing">0</div>
+            <div class="stat-title">Not Found</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-title">📊 Directory Audit Breakdown</div>
+      <div id="directoryCardsList"></div>
+
+      <div class="action-row">
+        <button class="btn-secondary" onclick="copyMarkdownReport()">📋 Copy Markdown Report</button>
+        <button class="btn-secondary" onclick="downloadJSONReport()">💾 Export JSON</button>
+        <button class="btn-secondary" onclick="resetForm()" style="margin-left: auto;">🔄 Audit Another Business</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let lastReportData = null;
+let lastMarkdownReport = '';
+
+document.getElementById('auditForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const data = {
+    businessName: document.getElementById('businessName').value,
+    category: document.getElementById('category').value,
+    address: document.getElementById('address').value,
+    city: document.getElementById('city').value,
+    pincode: document.getElementById('pincode').value,
+    phone: document.getElementById('phone').value,
+    website: document.getElementById('website').value
+  };
+
+  document.getElementById('formCard').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('resultsContainer').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await resp.json();
+    if (!result.success) {
+      alert('Audit error: ' + (result.error || 'Unknown error'));
+      resetForm();
+      return;
+    }
+
+    lastReportData = result.report;
+    lastMarkdownReport = result.markdownReport;
+    renderResults(result.report);
+
+  } catch (err) {
+    alert('Failed to connect to audit server: ' + err.message);
+    resetForm();
+  }
+});
+
+function renderResults(report) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('resultsContainer').style.display = 'block';
+
+  // Update Score & Metrics
+  const score = report.auditScore;
+  document.getElementById('scoreValue').textContent = score + '%';
+  document.getElementById('scoreCircle').style.setProperty('--score', score);
+
+  document.getElementById('statChecked').textContent = report.totalDirectoriesChecked;
+  document.getElementById('statConsistent').textContent = report.consistentCount;
+  document.getElementById('statInconsistent').textContent = report.inconsistentCount;
+  document.getElementById('statMissing').textContent = report.missingCount;
+
+  // Render Directory Cards
+  const listEl = document.getElementById('directoryCardsList');
+  listEl.innerHTML = '';
+
+  report.results.forEach(res => {
+    const card = document.createElement('div');
+    card.className = 'dir-card';
+
+    let diffRows = '';
+    if (res.diffs && res.diffs.length > 0) {
+      res.diffs.forEach(d => {
+        const matchSymbol = d.matchStatus === 'EXACT' ? '✓' : (d.matchStatus === 'DRIFT' ? '⚠' : '✗');
+        diffRows += \`
+          <tr>
+            <td><strong>\${d.field.toUpperCase()}</strong></td>
+            <td>\${d.expectedValue || '<em style="color:#64748b">None</em>'}</td>
+            <td>\${d.actualValue || '<em style="color:#64748b">Not Listed</em>'}</td>
+            <td class="match-icon match-\${d.matchStatus}">\${matchSymbol} \${d.matchStatus}</td>
+          </tr>
+        \`;
+      });
+    }
+
+    card.innerHTML = \`
+      <div class="dir-header">
+        <span class="dir-name">\${res.directoryName}</span>
+        <span class="status-badge badge-\${res.status}">\${res.status} (\${res.overallConfidence}% Match)</span>
+      </div>
+      \${res.errorMessage ? \`<p style="color:#f87171; font-size:0.85rem;">Error: \${res.errorMessage}</p>\` : ''}
+      \${diffRows ? \`
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Source of Truth</th>
+              <th>Listed Value</th>
+              <th>Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            \${diffRows}
+          </tbody>
+        </table>
+      \` : '<p style="color:var(--text-muted); font-size:0.85rem;">No profile listing found on this directory.</p>'}
+    \`;
+
+    listEl.appendChild(card);
+  });
+}
+
+function resetForm() {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('resultsContainer').style.display = 'none';
+  document.getElementById('formCard').style.display = 'block';
+}
+
+function copyMarkdownReport() {
+  if (lastMarkdownReport) {
+    navigator.clipboard.writeText(lastMarkdownReport);
+    alert('Markdown report copied to clipboard!');
+  }
+}
+
+function downloadJSONReport() {
+  if (lastReportData) {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastReportData, null, 2));
+    const dlAnchor = document.createElement('a');
+    dlAnchor.setAttribute("href", dataStr);
+    dlAnchor.setAttribute("download", `nap-audit-\${lastReportData.businessInfo.businessName.replace(/\\s+/g, '-')}.json`);
+    document.body.appendChild(dlAnchor);
+    dlAnchor.click();
+    dlAnchor.remove();
+  }
+}
+</script>
+
+</body>
+</html>`);
+});
+
+app.listen(PORT, () => {
+  console.log(`\n======================================================`);
+  console.log(`🌐 Local Citation & NAP Audit Web Server is running!`);
+  console.log(`📍 Web Dashboard: http://localhost:${PORT}`);
+  console.log(`======================================================\n`);
+});

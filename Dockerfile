@@ -15,5 +15,8 @@ COPY . .
 # Build TypeScript code
 RUN npm run build
 
-# Start our own 100% self-hosted Cloud Worker
-CMD ["npm", "run", "worker"]
+# Expose Web Dashboard Port
+EXPOSE 3000
+
+# Start 100% self-hosted Web Dashboard & Audit Server
+CMD ["npm", "start"]
