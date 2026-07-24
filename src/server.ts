@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import path from 'path';
 import { CitationAuditAgent } from './index';
 import { SourceOfTruthNAP } from './types/nap';
 import { NAPReporter } from './reports/reporter';
@@ -50,8 +49,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Serve the Single Page Web Dashboard
-app.get('/', (req: Request, res: Response) => {
-  res.send(`<!DOCTYPE html>
+const getDashboardHTML = () => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -211,7 +209,7 @@ app.get('/', (req: Request, res: Response) => {
       transform: none;
     }
 
-    /* Loading Overlay */
+    /* Loading State */
     .loading-state {
       display: none;
       text-align: center;
@@ -361,7 +359,6 @@ app.get('/', (req: Request, res: Response) => {
     .diff-table th {
       color: var(--text-muted);
       font-weight: 600;
-
     }
 
     .match-icon {
@@ -404,8 +401,8 @@ app.get('/', (req: Request, res: Response) => {
 <div class="container">
   <header>
     <h1>Local Citation & NAP Audit Agent</h1>
-    <p>100% Self-Hosted Automated Directory Scraper & diffing engine</p>
-    <div class="badge-cloud">⚡ Built-in Chromium Scraper | Justdial • Practo • Sulekha • Google</div>
+    <p>100% Self-Hosted Automated Directory Scraper & Diffing Engine</p>
+    <div class="badge-cloud">⚡ Built-in Scraper | Justdial • Practo • Sulekha • Google</div>
   </header>
 
   <!-- Input Form -->
@@ -452,7 +449,7 @@ app.get('/', (req: Request, res: Response) => {
   <div class="card loading-state" id="loadingState">
     <div class="spinner"></div>
     <h3 style="font-family: 'Outfit'; font-size: 1.4rem; margin-bottom: 0.5rem;">Auditing Indian Local Directories...</h3>
-    <p style="color: var(--text-muted); font-size: 0.95rem;">Launching Playwright headless Chromium worker to scan Justdial, Practo, Sulekha, and Google Business Profile.</p>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">Scanning Justdial, Practo, Sulekha, and Google Business Profile.</p>
   </div>
 
   <!-- Results Dashboard -->
@@ -546,7 +543,6 @@ function renderResults(report) {
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('resultsContainer').style.display = 'block';
 
-  // Update Score & Metrics
   const score = report.auditScore;
   document.getElementById('scoreValue').textContent = score + '%';
   document.getElementById('scoreCircle').style.setProperty('--score', score);
@@ -556,7 +552,6 @@ function renderResults(report) {
   document.getElementById('statInconsistent').textContent = report.inconsistentCount;
   document.getElementById('statMissing').textContent = report.missingCount;
 
-  // Render Directory Cards
   const listEl = document.getElementById('directoryCardsList');
   listEl.innerHTML = '';
 
@@ -568,39 +563,18 @@ function renderResults(report) {
     if (res.diffs && res.diffs.length > 0) {
       res.diffs.forEach(d => {
         const matchSymbol = d.matchStatus === 'EXACT' ? '✓' : (d.matchStatus === 'DRIFT' ? '⚠' : '✗');
-        diffRows += \`
-          <tr>
-            <td><strong>\${d.field.toUpperCase()}</strong></td>
-            <td>\${d.expectedValue || '<em style="color:#64748b">None</em>'}</td>
-            <td>\${d.actualValue || '<em style="color:#64748b">Not Listed</em>'}</td>
-            <td class="match-icon match-\${d.matchStatus}">\${matchSymbol} \${d.matchStatus}</td>
-          </tr>
-        \`;
+        diffRows += '<tr>' +
+          '<td><strong>' + d.field.toUpperCase() + '</strong></td>' +
+          '<td>' + (d.expectedValue || '<em style="color:#64748b">None</em>') + '</td>' +
+          '<td>' + (d.actualValue || '<em style="color:#64748b">Not Listed</em>') + '</td>' +
+          '<td class="match-icon match-' + d.matchStatus + '">' + matchSymbol + ' ' + d.matchStatus + '</td>' +
+        '</tr>';
       });
     }
 
-    card.innerHTML = \`
-      <div class="dir-header">
-        <span class="dir-name">\${res.directoryName}</span>
-        <span class="status-badge badge-\${res.status}">\${res.status} (\${res.overallConfidence}% Match)</span>
-      </div>
-      \${res.errorMessage ? \`<p style="color:#f87171; font-size:0.85rem;">Error: \${res.errorMessage}</p>\` : ''}
-      \${diffRows ? \`
-        <table class="diff-table">
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>Source of Truth</th>
-              <th>Listed Value</th>
-              <th>Match</th>
-            </tr>
-          </thead>
-          <tbody>
-            \${diffRows}
-          </tbody>
-        </table>
-      \` : '<p style="color:var(--text-muted); font-size:0.85rem;">No profile listing found on this directory.</p>'}
-    \`;
+    var errHtml = res.errorMessage ? ('<p style="color:#f87171; font-size:0.85rem;">Error: ' + res.errorMessage + '</p>') : '';
+    var tableHtml = diffRows ? ('<table class="diff-table"><thead><tr><th>Field</th><th>Source of Truth</th><th>Listed Value</th><th>Match</th></tr></thead><tbody>' + diffRows + '</tbody></table>') : '<p style="color:var(--text-muted); font-size:0.85rem;">No profile listing found on this directory.</p>';
+    card.innerHTML = '<div class="dir-header"><span class="dir-name">' + res.directoryName + '</span><span class="status-badge badge-' + res.status + '">' + res.status + ' (' + res.overallConfidence + '% Match)</span></div>' + errHtml + tableHtml;
 
     listEl.appendChild(card);
   });
@@ -624,7 +598,7 @@ function downloadJSONReport() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastReportData, null, 2));
     const dlAnchor = document.createElement('a');
     dlAnchor.setAttribute("href", dataStr);
-    dlAnchor.setAttribute("download", `nap-audit-\${lastReportData.businessInfo.businessName.replace(/\\s+/g, '-')}.json`);
+    dlAnchor.setAttribute("download", 'nap-audit-' + (lastReportData.businessInfo.businessName || 'report').replace(/\\s+/g, '-') + '.json');
     document.body.appendChild(dlAnchor);
     dlAnchor.click();
     dlAnchor.remove();
@@ -633,7 +607,10 @@ function downloadJSONReport() {
 </script>
 
 </body>
-</html>`);
+</html>`;
+
+app.get('/', (req: Request, res: Response) => {
+  res.send(getDashboardHTML());
 });
 
 app.listen(PORT, () => {
@@ -642,3 +619,5 @@ app.listen(PORT, () => {
   console.log(`📍 Web Dashboard: http://localhost:${PORT}`);
   console.log(`======================================================\n`);
 });
+
+export default app;
