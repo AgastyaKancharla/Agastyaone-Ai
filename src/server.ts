@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { CitationAuditAgent } from './agent';
+import { CitationAuditAgent } from './index';
 import { SourceOfTruthNAP } from './types/nap';
 import { NAPReporter } from './reports/reporter';
 
