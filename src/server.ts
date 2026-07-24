@@ -562,11 +562,14 @@ function renderResults(report) {
     let diffRows = '';
     if (res.diffs && res.diffs.length > 0) {
       res.diffs.forEach(d => {
+        const fieldNameStr = d.fieldName || d.field || 'field';
+        const sourceVal = d.sourceValue !== undefined ? d.sourceValue : (d.expectedValue || '');
+        const foundVal = d.foundValue !== undefined ? d.foundValue : (d.actualValue || '');
         const matchSymbol = d.matchStatus === 'EXACT' ? '✓' : (d.matchStatus === 'DRIFT' ? '⚠' : '✗');
         diffRows += '<tr>' +
-          '<td><strong>' + d.field.toUpperCase() + '</strong></td>' +
-          '<td>' + (d.expectedValue || '<em style="color:#64748b">None</em>') + '</td>' +
-          '<td>' + (d.actualValue || '<em style="color:#64748b">Not Listed</em>') + '</td>' +
+          '<td><strong>' + fieldNameStr.toUpperCase() + '</strong></td>' +
+          '<td>' + (sourceVal || '<em style="color:#64748b">None</em>') + '</td>' +
+          '<td>' + (foundVal || '<em style="color:#64748b">Not Listed</em>') + '</td>' +
           '<td class="match-icon match-' + d.matchStatus + '">' + matchSymbol + ' ' + d.matchStatus + '</td>' +
         '</tr>';
       });
