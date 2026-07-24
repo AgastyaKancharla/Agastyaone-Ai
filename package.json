@@ -1,0 +1,32 @@
+{
+  "name": "citation-audit-agent",
+  "version": "1.0.0",
+  "description": "Cloud-native Local Citation & NAP Audit Agent for Dental Clinics & Local SEO",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "worker": "ts-node src/worker.ts"
+  },
+  "keywords": [
+    "seo",
+    "local-seo",
+    "nap-audit",
+    "citation-agent",
+    "cloud-browser",
+    "browserless",
+    "supabase"
+  ],
+  "author": "AgastyaOne",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.42.0"
+  }
+}
