@@ -5,9 +5,12 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/server.ts",
-    "worker": "ts-node src/worker.ts",
-    "cli": "ts-node src/index.ts"
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "cli": "node dist/index.js",
+    "dev": "ts-node src/server.ts",
+    "dev:worker": "ts-node src/worker.ts",
+    "dev:cli": "ts-node src/index.ts"
   },
   "keywords": [
     "seo",

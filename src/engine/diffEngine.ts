@@ -33,7 +33,7 @@ export class NAPDiffEngine {
     const diffs: FieldDiff[] = [];
 
     // 1. Business Name Diff
-    const sourceNameNorm = NAPNormalizer.normalizeBusinessName(source.businessName);
+    const sourceNameNorm = NAPNormalizer.normalizeBusinessName(source.businessName || '');
     const foundNameNorm = NAPNormalizer.normalizeBusinessName(scraped.foundName || '');
     const nameSimilarity = NAPNormalizer.calculateSimilarity(sourceNameNorm, foundNameNorm);
     
@@ -52,7 +52,7 @@ export class NAPDiffEngine {
 
     diffs.push({
       fieldName: 'businessName',
-      sourceValue: source.businessName,
+      sourceValue: source.businessName || '',
       foundValue: scraped.foundName || '',
       matchStatus: nameStatus,
       similarityScore: nameSimilarity,
@@ -60,7 +60,7 @@ export class NAPDiffEngine {
     });
 
     // 2. Phone Number Diff
-    const sourcePhoneNorm = NAPNormalizer.normalizePhone(source.phone);
+    const sourcePhoneNorm = NAPNormalizer.normalizePhone(source.phone || '');
     const foundPhoneNorm = NAPNormalizer.normalizePhone(scraped.foundPhone || '');
     const phoneSimilarity = sourcePhoneNorm === foundPhoneNorm ? 100 : 0;
     
@@ -79,7 +79,7 @@ export class NAPDiffEngine {
 
     diffs.push({
       fieldName: 'phone',
-      sourceValue: source.phone,
+      sourceValue: source.phone || '',
       foundValue: scraped.foundPhone || '',
       matchStatus: phoneStatus,
       similarityScore: phoneSimilarity,
@@ -87,7 +87,7 @@ export class NAPDiffEngine {
     });
 
     // 3. Address Diff
-    const sourceAddrNorm = NAPNormalizer.normalizeAddress(`${source.address} ${source.city}`);
+    const sourceAddrNorm = NAPNormalizer.normalizeAddress(`${source.address || ''} ${source.city || ''}`.trim());
     const foundAddrNorm = NAPNormalizer.normalizeAddress(scraped.foundAddress || '');
     const addrSimilarity = NAPNormalizer.calculateSimilarity(sourceAddrNorm, foundAddrNorm);
 
@@ -109,7 +109,7 @@ export class NAPDiffEngine {
 
     diffs.push({
       fieldName: 'address',
-      sourceValue: source.address,
+      sourceValue: source.address || '',
       foundValue: scraped.foundAddress || '',
       matchStatus: addrStatus,
       similarityScore: addrSimilarity,

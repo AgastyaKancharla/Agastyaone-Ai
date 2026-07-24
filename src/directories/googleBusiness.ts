@@ -11,11 +11,12 @@ export class GoogleBusinessDirectoryProvider extends BaseDirectoryProvider {
     source: SourceOfTruthNAP,
     options?: { pageTimeout?: number }
   ): Promise<ScrapedListing | null> {
-    const searchQuery = `${source.businessName} ${source.address} ${source.city}`;
+    const searchQuery = `${source.businessName || ''} ${source.address || ''} ${source.city || ''}`.replace(/\s+/g, ' ').trim();
     const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
 
+    let browser;
     try {
-      const { browser } = await BrowserFactory.getBrowser();
+      ({ browser } = await BrowserFactory.getBrowser());
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       });
@@ -28,27 +29,26 @@ export class GoogleBusinessDirectoryProvider extends BaseDirectoryProvider {
       const foundWebsite = await page.locator('a[data-item-id="authority"] .Io6fl3').first().innerText().catch(() => '');
       const listingUrl = page.url();
 
-      await browser.close();
+      if (!foundName && !foundAddress) {
+        return null;
+      }
 
       return {
         directoryId: this.directoryId,
         directoryName: this.directoryName,
         listingUrl,
-        foundName: foundName.trim() || source.businessName,
-        foundAddress: foundAddress.trim() || `${source.address}, ${source.city}`,
-        foundPhone: foundPhone.trim() || source.phone,
-        foundWebsite: foundWebsite.trim() || source.website
+        foundName: foundName.trim(),
+        foundAddress: foundAddress.trim(),
+        foundPhone: foundPhone.trim(),
+        foundWebsite: foundWebsite.trim()
       };
-    } catch (err) {
-      return {
-        directoryId: this.directoryId,
-        directoryName: this.directoryName,
-        listingUrl: searchUrl,
-        foundName: source.businessName,
-        foundAddress: `${source.address}, ${source.city}`,
-        foundPhone: source.phone,
-        foundWebsite: source.website
-      };
+    } catch (err: any) {
+      // Do NOT fall back to source-of-truth data here — that would report a
+      // scrape failure as a "found, consistent" listing, which is worse than
+      // useless for a NAP audit. Surface the failure so it shows as ERROR.
+      throw new Error(`Google Business Profile scrape failed: ${err.message || err}`);
+    } finally {
+      await browser?.close().catch(() => {});
     }
   }
 }

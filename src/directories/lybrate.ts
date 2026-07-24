@@ -11,11 +11,12 @@ export class LybrateDirectoryProvider extends BaseDirectoryProvider {
     source: SourceOfTruthNAP,
     options?: { pageTimeout?: number }
   ): Promise<ScrapedListing | null> {
-    const searchQuery = `${source.businessName} ${source.city}`;
-    const searchUrl = `https://www.lybrate.com/search?q=${encodeURIComponent(searchQuery)}&city=${encodeURIComponent(source.city)}`;
+    const searchQuery = `${source.businessName || ''} ${source.city || ''}`.trim();
+    const searchUrl = `https://www.lybrate.com/search?q=${encodeURIComponent(searchQuery)}&city=${encodeURIComponent(source.city || '')}`;
 
+    let browser;
     try {
-      const { browser } = await BrowserFactory.getBrowser();
+      ({ browser } = await BrowserFactory.getBrowser());
       const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       });
@@ -26,8 +27,6 @@ export class LybrateDirectoryProvider extends BaseDirectoryProvider {
       const foundAddress = await page.locator('.doctor-card__locality, .clinic-address').first().innerText().catch(() => '');
       const foundPhone = await page.locator('.phone, .contact').first().innerText().catch(() => '');
       const listingUrl = page.url();
-
-      await browser.close();
 
       if (!foundName) {
         return null;
@@ -41,15 +40,13 @@ export class LybrateDirectoryProvider extends BaseDirectoryProvider {
         foundAddress: foundAddress.trim(),
         foundPhone: foundPhone.trim()
       };
-    } catch (err) {
-      return {
-        directoryId: this.directoryId,
-        directoryName: this.directoryName,
-        listingUrl: searchUrl,
-        foundName: source.businessName,
-        foundAddress: `${source.address}, ${source.city}`,
-        foundPhone: source.phone
-      };
+    } catch (err: any) {
+      // Do NOT fall back to source-of-truth data here — that would report a
+      // scrape failure as a "found, consistent" listing, which is worse than
+      // useless for a NAP audit. Surface the failure so it shows as ERROR.
+      throw new Error(`Lybrate scrape failed: ${err.message || err}`);
+    } finally {
+      await browser?.close().catch(() => {});
     }
   }
 }

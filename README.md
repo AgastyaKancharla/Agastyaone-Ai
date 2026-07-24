@@ -1,5 +1,30 @@
 # 100% Self-Hosted Local Citation & NAP Audit Suite
 
+> **Deploy target: Railway / Render / Fly.io / any Docker host — not Vercel.**
+> This service launches a real Chromium browser via Playwright, which needs a
+> persistent container and can run past typical serverless timeouts. Earlier
+> deploy attempts on Vercel (`api/index.ts` + `vercel.json`, now removed)
+> repeatedly failed for exactly this reason. Use the Dockerfile below instead.
+
+**Recent fixes (this session):**
+- Fixed TypeScript strict-null build errors introduced when `SourceOfTruthNAP`
+  fields became optional (`diffEngine.ts` + 3 directory adapters).
+- Removed a serious bug present in every directory adapter: on scrape
+  failure, the `catch` block was returning the *source-of-truth NAP as if it
+  were the scraped listing* — meaning a directory that was actually blocked,
+  timed out, or had no listing at all got silently reported as "found,
+  consistent." Adapters now throw on failure so it correctly surfaces as an
+  `ERROR` result instead of a false positive.
+- Fixed browser-instance leaks: each adapter now closes its Playwright
+  browser in a `finally` block, so a failed page load no longer leaves the
+  browser process running (this matters a lot on a long-lived container —
+  leaked browsers will eventually OOM the host).
+- `npm start` / `npm run worker` now run the compiled `dist/` output instead
+  of `ts-node` on raw source — matches what the Dockerfile actually builds,
+  and means `typescript`/`ts-node` don't need to ship in the runtime image.
+  Use `npm run dev` / `npm run dev:worker` for local iteration with ts-node.
+- Removed `vercel.json` and `api/index.ts` (the Vercel serverless wrapper).
+
 A production-grade, 100% self-hosted Local Citation & NAP Audit web dashboard and worker service built in Node.js, TypeScript, Express, and Playwright. Operates with zero third-party browser SaaS subscriptions (no Browserless/Apify/ZenRows).
 
 ---
