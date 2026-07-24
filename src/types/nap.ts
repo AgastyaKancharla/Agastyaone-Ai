@@ -1,13 +1,13 @@
 export interface SourceOfTruthNAP {
-  businessName: string;
-  address: string;
-  phone: string;
+  businessName?: string;
+  address?: string;
+  phone?: string;
   secondaryPhone?: string;
-  city: string;
+  city?: string;
   state?: string;
   pincode?: string;
   website?: string;
-  category: string;
+  category?: string;
   workingHours?: string;
 }
 
