@@ -6,6 +6,9 @@ export const CONFIG = {
   // Self-Hosted Playwright WebSocket endpoint (optional, if running separate Playwright container)
   PLAYWRIGHT_WS_ENDPOINT: process.env.PLAYWRIGHT_WS_ENDPOINT || '',
 
+  // Whether running in cloud mode (CDP / Browserless) vs local Chromium
+  IS_CLOUD_MODE: !!process.env.PLAYWRIGHT_WS_ENDPOINT,
+
   // Supabase Cloud DB Config
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
