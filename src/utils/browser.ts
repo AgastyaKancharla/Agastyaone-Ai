@@ -1,4 +1,4 @@
-import { chromium, Browser } from 'playwright';
+import { chromium, Browser } from 'playwright-core';
 import { CONFIG } from '../config/env';
 
 export class BrowserFactory {

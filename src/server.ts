@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // API Endpoint to execute NAP audit
-app.post('/api/audit', async (req: Request, res: Response) => {
+app.post(['/api/audit', '/audit'], async (req: Request, res: Response) => {
   try {
     const { businessName, address, city, pincode, phone, category, website } = req.body;
 
@@ -45,7 +45,7 @@ app.post('/api/audit', async (req: Request, res: Response) => {
 });
 
 // Health check endpoint
-app.get('/api/health', (req: Request, res: Response) => {
+app.get(['/api/health', '/health'], (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -1003,7 +1003,7 @@ function downloadJSONReport() {
 </body>
 </html>`;
 
-app.get('/', (req: Request, res: Response) => {
+app.get('*', (req: Request, res: Response) => {
   res.send(getDashboardHTML());
 });
 
