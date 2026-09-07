@@ -18,7 +18,7 @@ export function Shell({
   workspace: 'Console' | 'Portal';
   nav: NavItem[];
   user: { name: string; email: string };
-  context?: React.ReactNode;
+  context?: React.ReactNode | undefined;
   children: React.ReactNode;
 }) {
   return (
@@ -86,8 +86,8 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  description?: string;
-  action?: React.ReactNode;
+  description?: string | undefined;
+  action?: React.ReactNode | undefined;
 }) {
   return (
     <div className="border-b border-hairline bg-surface px-8 py-6">

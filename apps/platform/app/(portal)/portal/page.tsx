@@ -2,6 +2,7 @@ import { getSession } from '@/lib/session';
 import { getEntitlements, isEntitled } from '@/lib/entitlements';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader, EmptyState } from '@/components/shell';
+import { completeActionItem } from './actions';
 import { PORTAL_MODULES } from '@/lib/modules';
 
 export default async function PortalOverview() {
@@ -51,11 +52,19 @@ export default async function PortalOverview() {
                       <div className="text-sm font-medium">{a.title}</div>
                       {a.description && <p className="hint">{a.description}</p>}
                     </div>
-                    {a.due_on && (
-                      <span className="pill bg-accent/10 text-accent-deep shrink-0">
-                        due {new Date(a.due_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {a.due_on && (
+                        <span className="pill bg-accent/10 text-accent-deep">
+                          due {new Date(a.due_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                      <form action={completeActionItem}>
+                        <input type="hidden" name="item_id" value={a.id} />
+                        <button type="submit" className="btn-secondary text-xs py-1.5 px-3">
+                          Mark done
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 </li>
               ))}

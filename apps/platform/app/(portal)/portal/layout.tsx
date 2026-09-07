@@ -34,7 +34,9 @@ export default async function PortalLayout({ children }: { children: React.React
       href: m.href,
       label: m.label,
       icon: m.icon,
-      disabled: true, // screens land in their own slices
+      // Enabled as each slice lands; the rest show as visibly not-yet rather
+      // than as broken links.
+      disabled: !m.ready,
     })),
   ];
 

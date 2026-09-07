@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getEntitlements } from '@/lib/entitlements';
 import { PageHeader, StatusPill } from '@/components/shell';
 import { stateName } from '@/lib/india';
+import { createActionItem } from './actions';
 
 export default async function ClientDetail({
   params,
@@ -27,7 +28,7 @@ export default async function ClientDetail({
 
   if (!tenant) notFound();
 
-  const [{ data: locations }, entitlements, { data: catalog }] = await Promise.all([
+  const [{ data: locations }, entitlements, { data: catalog }, { data: actionItems }] = await Promise.all([
     supabase
       .from('tenant_locations')
       .select('id, name, address_line1, city, pincode, phone_e164, is_primary, status')
@@ -35,6 +36,12 @@ export default async function ClientDetail({
       .order('is_primary', { ascending: false }),
     getEntitlements(tenantId),
     supabase.from('service_catalog').select('code, name, is_bundle').eq('status', 'active').order('sort_order'),
+    supabase
+      .from('client_action_items')
+      .select('id, title, status, priority, due_on, blocked_days')
+      .eq('tenant_id', tenantId)
+      .order('status')
+      .order('due_on', { nullsFirst: false }),
   ]);
 
   const entitledCodes = new Set(entitlements.map((e) => e.service_code));
@@ -116,6 +123,61 @@ export default async function ClientDetail({
                   );
                 })}
               </ul>
+            </section>
+
+            <section className="card overflow-hidden">
+              <div className="px-6 py-4 border-b border-hairline">
+                <h2 className="font-medium">Waiting on the client</h2>
+                <p className="hint">
+                  Appears in their portal immediately. Recording it here is what turns
+                  &ldquo;we were blocked on you&rdquo; from a memory into a number at renewal.
+                </p>
+              </div>
+
+              {actionItems && actionItems.length > 0 && (
+                <ul className="divide-y divide-hairline">
+                  {actionItems.map((a) => (
+                    <li key={a.id} className="px-6 py-3 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className={`text-sm ${a.status === 'completed' ? 'text-muted line-through' : 'font-medium'}`}>
+                          {a.title}
+                        </div>
+                        <div className="text-xs text-muted">
+                          {a.status === 'completed' && a.blocked_days !== null
+                            ? `Closed after ${a.blocked_days} day${a.blocked_days === 1 ? '' : 's'}`
+                            : a.due_on
+                              ? `Due ${new Date(a.due_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+                              : 'No due date'}
+                        </div>
+                      </div>
+                      <StatusPill status={a.status === 'completed' ? 'active' : 'onboarding'} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <form action={createActionItem} className="px-6 py-4 border-t border-hairline space-y-3">
+                <input type="hidden" name="tenant_id" value={tenantId} />
+                <input name="title" required placeholder="What do you need from them?" className="input" />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <select name="category" defaultValue="access" className="input">
+                    <option value="access">Access</option>
+                    <option value="content">Content</option>
+                    <option value="approval">Approval</option>
+                    <option value="information">Information</option>
+                    <option value="payment">Payment</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <select name="priority" defaultValue="normal" className="input">
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <input type="date" name="due_on" className="input" />
+                </div>
+                <button type="submit" className="btn-secondary">Request from client</button>
+              </form>
             </section>
           </div>
 
