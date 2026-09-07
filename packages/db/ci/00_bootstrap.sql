@@ -38,6 +38,22 @@ grant anon, authenticated, service_role to current_user;
 create schema if not exists extensions;
 grant usage on schema extensions to public;
 
+-- Supabase ships `search_path="$user", public, extensions` set on the postgres
+-- ROLE (verified against the live project, not assumed), which is why the
+-- migrations can write `citext` and `gist` unqualified. Without it the first
+-- table using citext fails to create. Reproduced at the same level rather than
+-- on the database, so there is no difference here to reason about later.
+-- Role settings apply at session start, so this takes effect for every step
+-- after this one.
+do $$
+begin
+  execute format(
+    'alter role %I set search_path to %s',
+    current_user, '"$user", public, extensions'
+  );
+end
+$$;
+
 -- ---------------------------------------------------------------------------
 -- auth: what GoTrue owns on the real platform.
 -- Only the columns the migrations and the isolation suite actually touch.
@@ -97,39 +113,58 @@ create table if not exists pgmq.messages (
 );
 create table if not exists pgmq.archived (like pgmq.messages including all);
 
-create or replace function pgmq.create(queue_name text)
+-- Every parameter is p_-prefixed. In pgmq.read the output column `vt` is a
+-- timestamptz while the input `vt` is an integer, so an unprefixed parameter
+-- is silently captured by the RETURNS TABLE column and the function fails to
+-- create. `queue_name` and `msg_id` collide with real table columns the same
+-- way, and qualifying by function name is not available for `delete` and
+-- `archive` because those are reserved words.
+create or replace function pgmq.create(p_queue_name text)
 returns void language sql as $$ select null::void $$;
 
-create or replace function pgmq.send(queue_name text, msg jsonb)
+create or replace function pgmq.send(p_queue_name text, p_msg jsonb)
 returns bigint language sql as $$
-  insert into pgmq.messages (queue_name, message) values (queue_name, msg) returning msg_id;
+  insert into pgmq.messages (queue_name, message)
+  values (p_queue_name, p_msg)
+  returning pgmq.messages.msg_id;
 $$;
 
-create or replace function pgmq.read(queue_name text, vt integer, qty integer)
+-- Claims up to p_qty messages whose visibility timeout has expired and pushes
+-- that timeout p_vt seconds into the future, under FOR UPDATE SKIP LOCKED so
+-- two workers cannot claim the same message. That exclusion is the property
+-- the queue exists for, so the stub has to implement it rather than fake it.
+create or replace function pgmq.read(p_queue_name text, p_vt integer, p_qty integer)
 returns table (msg_id bigint, read_ct integer, enqueued_at timestamptz, vt timestamptz, message jsonb)
 language sql as $$
   update pgmq.messages m
-     set vt = now() + make_interval(secs => vt), read_ct = m.read_ct + 1
+     set vt = now() + make_interval(secs => p_vt),
+         read_ct = m.read_ct + 1
    where m.msg_id in (
      select s.msg_id from pgmq.messages s
-      where s.queue_name = read.queue_name and s.vt <= now()
+      where s.queue_name = p_queue_name and s.vt <= now()
       order by s.msg_id
-      limit qty
+      limit p_qty
       for update skip locked
    )
   returning m.msg_id, m.read_ct, m.enqueued_at, m.vt, m.message;
 $$;
 
-create or replace function pgmq.delete(queue_name text, msg_id bigint)
+create or replace function pgmq.delete(p_queue_name text, p_msg_id bigint)
 returns boolean language sql as $$
-  with d as (delete from pgmq.messages m where m.msg_id = delete.msg_id returning 1)
+  with d as (
+    delete from pgmq.messages m
+     where m.msg_id = p_msg_id and m.queue_name = p_queue_name
+    returning 1
+  )
   select exists (select 1 from d);
 $$;
 
-create or replace function pgmq.archive(queue_name text, msg_id bigint)
+create or replace function pgmq.archive(p_queue_name text, p_msg_id bigint)
 returns boolean language sql as $$
   with moved as (
-    delete from pgmq.messages m where m.msg_id = archive.msg_id returning m.*
+    delete from pgmq.messages m
+     where m.msg_id = p_msg_id and m.queue_name = p_queue_name
+    returning m.*
   ), ins as (
     insert into pgmq.archived select * from moved returning 1
   )

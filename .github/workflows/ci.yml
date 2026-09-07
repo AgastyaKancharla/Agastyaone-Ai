@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  # A branch with an open PR would otherwise run this twice per push, once for
+  # each event. `pull_request` covers branches under review; `push` covers main.
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 concurrency:
@@ -77,44 +79,10 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends postgresql-client
 
-      # Recreates what Supabase's platform provides: roles, the auth schema,
-      # auth.uid() reading the same GUC PostgREST sets, and a working pgmq.
-      - name: Bootstrap Supabase-equivalent environment
-        run: $PSQL -f packages/db/ci/00_bootstrap.sql
-
-      - name: Apply migrations in order
-        run: |
-          for f in packages/db/migrations/*.sql; do
-            echo "── $f"
-            $PSQL -f "$f"
-          done
-
-      - name: Apply seeds
-        run: |
-          for f in packages/db/seeds/*.sql; do
-            echo "── $f"
-            $PSQL -f "$f"
-          done
-
-      # RLS enabled and forced everywhere, no table without a policy, no view
-      # without security_invoker, no SECURITY DEFINER function with a mutable
-      # search_path, and a tenant_id-leading index wherever a policy filters on
-      # one. Each raises, so a violation fails the job.
-      - name: Schema guards
-        run: $PSQL -f packages/db/tests/schema_guards.sql
-
-      # The acceptance test for the whole security model.
-      - name: Tenant isolation
-        run: $PSQL -f packages/db/tests/rls_isolation.sql
-
-      # A guard that has never failed is not known to work. This deliberately
-      # breaks one invariant and asserts the guard catches it — if this step
-      # SUCCEEDS, the guards are not actually guarding anything.
-      - name: Prove the guards can fail
-        run: |
-          $PSQL -c "drop policy contacts_sel on public.contacts;"
-          if $PSQL -f packages/db/tests/schema_guards.sql; then
-            echo "::error::Schema guards PASSED with a policy removed — they are not detecting anything."
-            exit 1
-          fi
-          echo "Guards correctly rejected the broken schema."
+      # Bootstrap, migrations, seeds, schema guards, tenant isolation, and the
+      # sabotage cases that prove each guard detects its own violation. This is
+      # a script rather than a list of steps here so it can be run unchanged
+      # against a throwaway local cluster — otherwise the two drift and a local
+      # run stops being evidence about CI.
+      - name: Apply schema and assert the security model holds
+        run: packages/db/ci/run.sh
