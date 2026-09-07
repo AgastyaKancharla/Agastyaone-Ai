@@ -65,9 +65,17 @@ export default async function ClientDetail({
                 <ul className="divide-y divide-hairline">
                   {locations.map((l) => (
                     <li key={l.id} className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{l.name}</span>
-                        {l.is_primary && <span className="pill bg-brand-wash text-brand-deep">primary</span>}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{l.name}</span>
+                          {l.is_primary && <span className="pill bg-brand-wash text-brand-deep">primary</span>}
+                        </div>
+                        <Link
+                          href={`/console/clients/${tenantId}/nap/${l.id}`}
+                          className="text-xs text-brand hover:underline shrink-0"
+                        >
+                          Listings →
+                        </Link>
                       </div>
                       <div className="text-sm text-muted mt-1">
                         {[l.address_line1, l.city, l.pincode].filter(Boolean).join(', ') || 'No address on file'}
