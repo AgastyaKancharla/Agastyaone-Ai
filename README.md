@@ -1,110 +1,67 @@
-# 100% Self-Hosted Local Citation & NAP Audit Suite
+# AgastyaOne Platform
 
-> **Deploy target: Railway / Render / Fly.io / any Docker host — not Vercel.**
-> This service launches a real Chromium browser via Playwright, which needs a
-> persistent container and can run past typical serverless timeouts. Earlier
-> deploy attempts on Vercel (`api/index.ts` + `vercel.json`, now removed)
-> repeatedly failed for exactly this reason. Use the Dockerfile below instead.
+Multi-tenant service delivery platform for AgastyaOne — accounts into contracts,
+contracts into engagements, engagements into delivery, delivery into billing and
+reporting, all of it visible to the client through a portal.
 
-**Recent fixes (this session):**
-- Fixed TypeScript strict-null build errors introduced when `SourceOfTruthNAP`
-  fields became optional (`diffEngine.ts` + 3 directory adapters).
-- Removed a serious bug present in every directory adapter: on scrape
-  failure, the `catch` block was returning the *source-of-truth NAP as if it
-  were the scraped listing* — meaning a directory that was actually blocked,
-  timed out, or had no listing at all got silently reported as "found,
-  consistent." Adapters now throw on failure so it correctly surfaces as an
-  `ERROR` result instead of a false positive.
-- Fixed browser-instance leaks: each adapter now closes its Playwright
-  browser in a `finally` block, so a failed page load no longer leaves the
-  browser process running (this matters a lot on a long-lived container —
-  leaked browsers will eventually OOM the host).
-- `npm start` / `npm run worker` now run the compiled `dist/` output instead
-  of `ts-node` on raw source — matches what the Dockerfile actually builds,
-  and means `typescript`/`ts-node` don't need to ship in the runtime image.
-  Use `npm run dev` / `npm run dev:worker` for local iteration with ts-node.
-- Removed `vercel.json` and `api/index.ts` (the Vercel serverless wrapper).
+One product, one design system, **two workspaces**: a dense internal Console for
+AgastyaOne staff and a simpler Portal for clients. Your login decides which
+organisation's data you see, which modules are switched on, and what you may do.
 
-A production-grade, 100% self-hosted Local Citation & NAP Audit web dashboard and worker service built in Node.js, TypeScript, Express, and Playwright. Operates with zero third-party browser SaaS subscriptions (no Browserless/Apify/ZenRows).
+## Service lines
 
----
+The ten services are **catalog rows, not features**. Bundles are rows too, so
+selling the Front Desk Bundle entitles a tenant to its four components without a
+line of code. Adding an eleventh service is an INSERT.
 
-## 🏗️ Architecture
+| | Service | |
+| --- | --- | --- |
+| 1 | Website | build + client-owned domain + uptime |
+| 2 | GBP + Directory/NAP | *bundle* → GBP Management, Directory & NAP |
+| 3 | GEO (AI Search Visibility) | |
+| 4 | Front Desk Bundle | *bundle* → WhatsApp Automation, AI Receptionist, Missed-Call, Unified Inbox |
+| 5 | Call Tracking | |
+| 6 | Booking Capture & Routing | |
+| 7 | CRM | |
+| 8 | Reporting Dashboard | |
+| 9 | Review Automation | |
+| 10 | Lifecycle Bundle | *bundle* → Recall, Patient Reactivation, Post-Treatment Follow-Up |
+
+## Layout
 
 ```
-                               ┌──────────────────────────────────────────────┐
-                               │   Interactive Web Dashboard (Built-in UI)    │
-                               │   - Form to enter business details           │
-                               │   - Real-time audit progress & score card    │
-                               │   - Export Markdown / JSON reports           │
-                               └──────────────────────┬───────────────────────┘
-                                                      │ (Triggers audit)
-                                                      ▼
- ┌──────────────────────┐  (Optional DB Queue)  ┌──────────────────────────────┐
- │ Next.js CRM (Vercel) ├──────────────────────▶│  Self-Hosted Container App   │──▶ Playwright Chromium ──▶ [ Justdial / Practo / GBP / Sulekha ]
- └──────────────────────┘                       │  (Railway / Render / Docker) │
-                                                └──────────────────────────────┘
+apps/
+  platform/     Next.js 15 — Console + Portal   (not yet built)
+  worker/       Playwright + queue consumer     (not yet built)
+packages/
+  db/           schema, RLS, seeds, tests       ✅
+  nap-engine/   NAP normaliser + diff engine    (not yet built)
+  ui/           shared design system            (not yet built)
 ```
 
----
+## Design decisions worth knowing
 
-## ✨ Key Features
+- **Tenancy is enforced in the database.** Every table has RLS enabled *and*
+  forced, so a forgotten check in application code cannot leak across tenants.
+  18 pgTAP assertions prove it; see `packages/db/tests/`.
+- **`contacts` is the spine.** A call, a booking, a review request and a
+  WhatsApp thread all resolve to the same contact through
+  `app.resolve_contact()`, which normalises to E.164 inside Postgres. Without
+  this the platform would be ten silos sharing a login.
+- **Locations, not businesses.** NAP, GBP, calls and reviews are per-branch, so
+  every runtime table carries `location_id` alongside `tenant_id`.
+- **GST is modelled properly.** CGST/SGST vs IGST is decided by place of supply
+  and cannot be reconstructed retroactively; TDS is explicit because B2B clients
+  deduct it and payments arrive short; invoice numbers come from a gapless
+  per-financial-year sequence; issued invoices are corrected by credit note.
+- **Consent exists before the first contact row.** WhatsApp lifecycle messaging
+  needs opt-in provenance under Meta policy and lawful basis under the DPDP Act,
+  and consent cannot be invented after the fact.
+- **Entitlement is not security.** RLS answers "is this your data"; entitlement
+  answers "did you buy this module". Conflating them makes a lapsed subscription
+  hide a client's own history.
 
-1. **Integrated Web Dashboard**: Clean, responsive UI served on Port `3000` to enter business details (Name, Address, City, Pincode, Phone, Website) and get live audit reports with field-level diffing.
-2. **Zero External SaaS Dependencies**: Runs bundled Playwright Chromium inside the worker container using `mcr.microsoft.com/playwright:v1.42.0-jammy`.
-3. **Smart Indian Address & Phone Normalization**: Strips `+91`, handles STD prefixes, and standardizes local area aliases (`Bengaluru`/`Bangalore`, `HSR`, `Koramangala`, `Rd`/`Road`).
-4. **Field-Level Diffing**: Generates exact match confidence scores (`CONSISTENT`, `DRIFT`, `INCONSISTENT`, `NOT_FOUND`).
-5. **Supabase Integration (Optional)**: Can run as an async queue worker for background processing.
+## Status
 
----
-
-## 🚀 Deployment (Railway / Render / Fly.io / VPS / Docker)
-
-### Option A: 1-Click Container Deployment (Web Dashboard + Scraper)
-Deploy directly using the provided `Dockerfile` to Railway, Render, Fly.io, or any VPS.
-
-1. Connect your git repository to **Railway** or **Render**.
-2. Railway/Render will automatically pick up the `Dockerfile` and build it with pre-bundled Chromium binaries.
-3. Once deployed, open your generated domain (e.g. `https://citation-audit-agent.up.railway.app`) to access the web form and run audits anytime!
-
-### Option B: Local Web Server Testing
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Install Playwright Chromium binaries
-npx playwright install chromium
-
-# 3. Start Web Dashboard
-npm start
-# Open http://localhost:3000 in your browser
-```
-
-### Option C: Async Supabase Worker Mode
-To run in background polling mode for Supabase queue jobs:
-```bash
-npm run worker
-```
-
----
-
-## 📡 REST API Endpoint
-
-### `POST /api/audit`
-Triggers an automated NAP audit programmatically.
-
-**Request Body:**
-```json
-{
-  "businessName": "Nissa Dental Clinic & Implant Center",
-  "address": "No. 45, 100 Feet Road, 4th Block, Koramangala",
-  "city": "Bengaluru",
-  "pincode": "560034",
-  "phone": "08098765432",
-  "category": "Dental Clinic",
-  "website": "https://nissadental.com"
-}
-```
-
-**Response:**
-Returns complete `NAPAuditReport` object with directory scores, field diffs, and generated Markdown report.
+Slice 0 (foundations) is in progress. The schema, RLS and tests are done; the
+Next.js app is next. See `packages/db/README.md` for the migration order.
