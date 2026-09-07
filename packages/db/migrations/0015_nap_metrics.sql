@@ -19,7 +19,16 @@
 -- review polling — but it is not used for this.
 -- =============================================================================
 
-create extension if not exists pg_cron;
+-- pg_cron needs shared_preload_libraries and superuser, which a CI container has
+-- neither of. Nothing in this migration schedules a job — the extension is
+-- installed here for later time-based work (uptime checks, review polling) — so
+-- its absence must not block the trigger below, which is the actual payload.
+do $$
+begin
+  create extension if not exists pg_cron;
+exception when others then
+  raise notice 'pg_cron unavailable (%). Scheduled jobs will not run in this environment.', sqlerrm;
+end $$;
 
 create or replace function app.snapshot_nap_metrics()
 returns trigger

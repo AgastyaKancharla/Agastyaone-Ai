@@ -28,6 +28,13 @@ export default async function ClientDetail({
 
   if (!tenant) notFound();
 
+  // Record privileged cross-account access. The function decides whether this
+  // qualifies — it no-ops for clients, for assigned staff, and for any scope
+  // other than 'all' — so the call site stays unconditional and cannot get the
+  // condition wrong. Postgres has no SELECT trigger, so the read path is the
+  // only place this can happen.
+  await supabase.rpc('log_tenant_access', { p_tenant_id: tenantId, p_reason: 'console_client_detail' });
+
   const [{ data: locations }, entitlements, { data: catalog }, { data: actionItems }] = await Promise.all([
     supabase
       .from('tenant_locations')

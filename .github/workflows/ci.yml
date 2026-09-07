@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, no database. Kept separate so a slow container never delays the
+  # feedback that catches most mistakes.
+  checks:
+    name: Tests, types, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: NAP engine unit tests
+        run: npm test --workspace @agastyaone/nap-engine
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      # Includes the no-restricted-imports boundary that keeps the service-role
+      # client — which bypasses RLS on every table — out of page components.
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://build-time-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: build-time-placeholder
+
+  # The one that matters. Applies every migration to a throwaway Postgres and
+  # asserts the security model still holds — no production credentials involved.
+  database:
+    name: Schema guards and tenant isolation
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agastyaone_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: agastyaone_test
+      # Any failure anywhere aborts the job rather than scrolling past.
+      PSQL: psql -v ON_ERROR_STOP=1 --no-psqlrc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # Recreates what Supabase's platform provides: roles, the auth schema,
+      # auth.uid() reading the same GUC PostgREST sets, and a working pgmq.
+      - name: Bootstrap Supabase-equivalent environment
+        run: $PSQL -f packages/db/ci/00_bootstrap.sql
+
+      - name: Apply migrations in order
+        run: |
+          for f in packages/db/migrations/*.sql; do
+            echo "── $f"
+            $PSQL -f "$f"
+          done
+
+      - name: Apply seeds
+        run: |
+          for f in packages/db/seeds/*.sql; do
+            echo "── $f"
+            $PSQL -f "$f"
+          done
+
+      # RLS enabled and forced everywhere, no table without a policy, no view
+      # without security_invoker, no SECURITY DEFINER function with a mutable
+      # search_path, and a tenant_id-leading index wherever a policy filters on
+      # one. Each raises, so a violation fails the job.
+      - name: Schema guards
+        run: $PSQL -f packages/db/tests/schema_guards.sql
+
+      # The acceptance test for the whole security model.
+      - name: Tenant isolation
+        run: $PSQL -f packages/db/tests/rls_isolation.sql
+
+      # A guard that has never failed is not known to work. This deliberately
+      # breaks one invariant and asserts the guard catches it — if this step
+      # SUCCEEDS, the guards are not actually guarding anything.
+      - name: Prove the guards can fail
+        run: |
+          $PSQL -c "drop policy contacts_sel on public.contacts;"
+          if $PSQL -f packages/db/tests/schema_guards.sql; then
+            echo "::error::Schema guards PASSED with a policy removed — they are not detecting anything."
+            exit 1
+          fi
+          echo "Guards correctly rejected the broken schema."

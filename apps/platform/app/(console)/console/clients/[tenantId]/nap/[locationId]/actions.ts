@@ -17,19 +17,24 @@ export async function saveSourceOfTruth(_prev: NapState, formData: FormData): Pr
   const businessName = String(formData.get('business_name') ?? '').trim();
   if (!businessName) return { error: 'Business name is required — it is what listings are matched against.' };
 
+  // Only send the fields that actually have a value. Under
+  // exactOptionalPropertyTypes an explicit `undefined` is not the same as an
+  // absent key, and the RPC's params are `?: string` — omitting the key is what
+  // lets the SQL DEFAULT NULL apply, which is the intent.
+  const optional: Record<string, string> = {};
+  for (const field of [
+    'address_line1', 'address_line2', 'locality', 'city',
+    'state', 'pincode', 'phone_raw', 'website', 'category',
+  ] as const) {
+    const value = String(formData.get(field) ?? '').trim();
+    if (value) optional[`p_${field}`] = value;
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_nap_source_of_truth', {
     p_location_id: locationId,
     p_business_name: businessName,
-    p_address_line1: String(formData.get('address_line1') ?? '').trim() || null,
-    p_address_line2: String(formData.get('address_line2') ?? '').trim() || null,
-    p_locality: String(formData.get('locality') ?? '').trim() || null,
-    p_city: String(formData.get('city') ?? '').trim() || null,
-    p_state: String(formData.get('state') ?? '').trim() || null,
-    p_pincode: String(formData.get('pincode') ?? '').trim() || null,
-    p_phone_raw: String(formData.get('phone_raw') ?? '').trim() || null,
-    p_website: String(formData.get('website') ?? '').trim() || null,
-    p_category: String(formData.get('category') ?? '').trim() || null,
+    ...optional,
   });
 
   if (error) return { error: error.message };

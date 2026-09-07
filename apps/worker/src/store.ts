@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@agastyaone/db/types';
 import type { AuditSummary, DirectoryResult, SourceOfTruth } from '@agastyaone/nap-engine';
 import { CONFIG } from './config.ts';
 
@@ -8,7 +9,7 @@ import { CONFIG } from './config.ts';
  * explicitly on every row it writes — which is why tenant_id is threaded
  * through rather than inferred.
  */
-export const db: SupabaseClient = createClient(CONFIG.supabaseUrl, CONFIG.serviceRoleKey, {
+export const db: SupabaseClient<Database> = createClient<Database>(CONFIG.supabaseUrl, CONFIG.serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 

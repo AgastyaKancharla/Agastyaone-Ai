@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@agastyaone/db/types';
 
 /**
  * SERVICE ROLE CLIENT — BYPASSES ROW LEVEL SECURITY ENTIRELY.
@@ -19,7 +20,7 @@ export function createAdminClient() {
   if (!key) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
   }
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

@@ -7,6 +7,11 @@
     "note": "Migrations are applied via the Supabase MCP or CLI; these scripts document the files, they do not connect on their own.",
     "list": "ls -1 migrations/*.sql",
     "test:isolation": "echo 'Run tests/rls_isolation.sql against the target project (transactional, rolls back).'",
-    "check": "echo 'Run tests/schema_guards.sql against the target project; it raises on any violated invariant.'"
+    "check": "echo 'Run tests/schema_guards.sql against the target project; it raises on any violated invariant.'",
+    "types": "echo 'Regenerate via the Supabase MCP or: supabase gen types typescript --project-id xxjmtthbfqgxdapbxyng > types/database.types.ts'"
+  },
+  "types": "./types/database.types.ts",
+  "exports": {
+    "./types": "./types/database.types.ts"
   }
 }

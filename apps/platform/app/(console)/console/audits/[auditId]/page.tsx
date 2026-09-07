@@ -10,13 +10,9 @@ export default async function AuditDetail({ params }: { params: Promise<{ auditI
 
   const { data: audit } = await supabase
     .from('nap_audits')
-    .select(`
-      id, tenant_id, location_id, status, audit_score, coverage_pct,
-      directories_requested, directories_checked, directories_errored,
-      ambiguous_count, created_at, completed_at, error_message,
-      tenant_locations ( name, city ),
-      nap_source_of_truth ( version, business_name, address_line1, locality, city, pincode, phone_e164, website )
-    `)
+    .select(
+      'id, tenant_id, location_id, status, audit_score, coverage_pct, directories_requested, directories_checked, directories_errored, ambiguous_count, created_at, completed_at, error_message, tenant_locations ( name, city ), nap_source_of_truth ( version, business_name, address_line1, locality, city, pincode, phone_e164, website )',
+    )
     .eq('id', auditId)
     .maybeSingle();
 
@@ -24,11 +20,9 @@ export default async function AuditDetail({ params }: { params: Promise<{ auditI
 
   const { data: results } = await supabase
     .from('nap_audit_results')
-    .select(`
-      id, directory_code, status, listing_url, found, match_confidence,
-      runner_up_margin, overall_confidence, error_message,
-      nap_field_diffs ( field_name, source_value, found_value, match_status, similarity_score, notes )
-    `)
+    .select(
+      'id, directory_code, status, listing_url, found, match_confidence, runner_up_margin, overall_confidence, error_message, nap_field_diffs ( field_name, source_value, found_value, match_status, similarity_score, notes )',
+    )
     .eq('audit_id', auditId)
     .order('directory_code');
 

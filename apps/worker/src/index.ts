@@ -18,7 +18,10 @@ async function claim(): Promise<QueueMessage | null> {
     p_qty: 1,
   });
   if (error) throw new Error(`Queue read failed: ${error.message}`);
-  return (data as QueueMessage[] | null)?.[0] ?? null;
+  // `message` comes back as Json — deliberately wider than the job shape — so
+  // the narrowing goes through unknown. The shape is guaranteed by
+  // enqueue_nap_audit, which is the only writer to this queue.
+  return (data as unknown as QueueMessage[] | null)?.[0] ?? null;
 }
 
 async function handle(job: QueueMessage): Promise<void> {

@@ -15,7 +15,16 @@
 -- of that has to be hand-rolled.
 -- =============================================================================
 
-create extension if not exists pgmq;
+-- Tolerant on purpose. On Supabase this installs the real extension; in CI the
+-- bootstrap has already provided a working pgmq schema, where CREATE EXTENSION
+-- would fail on the name clash. Failing here would block every later migration
+-- over an environment difference rather than a defect.
+do $$
+begin
+  create extension if not exists pgmq;
+exception when others then
+  raise notice 'pgmq extension not installed (%). Continuing — expected when a compatible pgmq schema already exists.', sqlerrm;
+end $$;
 
 select pgmq.create('nap_audits');
 
