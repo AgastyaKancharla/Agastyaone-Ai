@@ -61,6 +61,20 @@ packages/
   answers "did you buy this module". Conflating them makes a lapsed subscription
   hide a client's own history.
 
+## Deployments
+
+`vercel.json` disables Git-triggered deployments for this repository.
+
+The retired `citation-audit-agent` Vercel project is still Git-linked here, so
+every push fired a deployment against a paused project and failed with
+"Deployment was blocked" — red CI caused entirely by a retired app rather than
+by any code in the repo.
+
+When the platform gets its own Vercel project it will set its root directory to
+`apps/platform` and carry its own config, at which point this file can be
+removed or scoped to specific branches. The tidier fix is to delete the
+`citation-audit-agent` project outright.
+
 ## Status
 
 Slice 0 (foundations) is in progress. The schema, RLS and tests are done; the
