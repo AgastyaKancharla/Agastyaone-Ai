@@ -40,3 +40,19 @@ Both are safe to run against any environment.
   per-branch facts.
 - RLS predicates are `tenant_id in (select unnest(app.accessible_tenant_ids()))`
   — row-independent, so it evaluates once per query rather than once per row.
+
+## Bootstrapping access
+
+`migrations/0012_user_provisioning.sql` provisions a `profiles` row whenever
+Supabase Auth creates a user, and applies the bootstrap rule for staff:
+
+- An `@agastyaone.com` address becomes staff. The **first** one gets
+  `tenant_scope = 'all'` and the `owner` role, because otherwise nobody could
+  ever assign anybody. Every one after starts on `'assigned'` with no role
+  until granted.
+- Any other address becomes a client, with no staff row and no tenant until an
+  account manager links them.
+
+Staff status grants Console *access*, not data access — which tenants a staff
+member can actually see is still decided by `tenant_scope` and
+`account_assignments`, so a new joiner sees nothing until assigned.

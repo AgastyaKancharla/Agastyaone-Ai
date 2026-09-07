@@ -30,19 +30,28 @@ values
   ('33333333-0000-4000-8000-000000000003'::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'client-a@test.local',       now(), now()),
   ('44444444-0000-4000-8000-000000000004'::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'client-b@test.local',       now(), now());
 
+-- Upsert, not insert: since 0012 the on_auth_user_created trigger already
+-- provisioned a profile for every auth.users row above. This overwrites the
+-- derived values with what the fixture intends.
 insert into profiles (id, email, full_name, user_type) values
   ('11111111-0000-4000-8000-000000000001'::uuid,      'staff-all@test.local',      'Staff All',      'staff'),
   ('22222222-0000-4000-8000-000000000002'::uuid,   'staff-assigned@test.local', 'Staff Assigned', 'staff'),
   ('33333333-0000-4000-8000-000000000003'::uuid, 'client-a@test.local',       'Client A',       'client'),
-  ('44444444-0000-4000-8000-000000000004'::uuid, 'client-b@test.local',       'Client B',       'client');
+  ('44444444-0000-4000-8000-000000000004'::uuid, 'client-b@test.local',       'Client B',       'client')
+on conflict (id) do update
+  set full_name = excluded.full_name, user_type = excluded.user_type;
 
 insert into tenants (id, slug, name, vertical, status) values
   ('aaaaaaaa-0000-4000-8000-000000000001'::uuid, 'test-clinic-a', 'Test Clinic A', 'dental', 'active'),
   ('bbbbbbbb-0000-4000-8000-000000000002'::uuid, 'test-clinic-b', 'Test Clinic B', 'dental', 'active');
 
+-- Also an upsert: an @agastyaone.com fixture would already have been promoted
+-- to staff by the 0012 trigger. These addresses are not, but keeping the upsert
+-- means the suite does not care either way.
 insert into staff_members (profile_id, tenant_scope, status) values
   ('11111111-0000-4000-8000-000000000001'::uuid,    'all',      'active'),
-  ('22222222-0000-4000-8000-000000000002'::uuid, 'assigned', 'active');
+  ('22222222-0000-4000-8000-000000000002'::uuid, 'assigned', 'active')
+on conflict (profile_id) do update set tenant_scope = excluded.tenant_scope;
 
 -- The assigned-scope staff member is attached to tenant A only.
 insert into account_assignments (tenant_id, staff_id, role, status)
