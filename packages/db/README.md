@@ -56,3 +56,34 @@ Supabase Auth creates a user, and applies the bootstrap rule for staff:
 Staff status grants Console *access*, not data access — which tenants a staff
 member can actually see is still decided by `tenant_scope` and
 `account_assignments`, so a new joiner sees nothing until assigned.
+
+## Running the checks
+
+`ci/run.sh` is the whole database job — bootstrap, migrations, seeds, schema
+guards, tenant isolation, and the sabotage cases that prove each guard detects
+its own violation. CI calls this exact script, so a local run is real evidence
+about CI rather than an approximation of it.
+
+It needs an empty database and standard `PG*` variables. **Never point it at a
+real project**: it disables RLS and drops policies at the end, on purpose.
+
+```bash
+# A throwaway cluster; any Postgres 15+ with the contrib extensions will do.
+initdb -D /tmp/pg -U postgres
+pg_ctl -D /tmp/pg -o "-p 5433" -l /tmp/pg/server.log start
+psql -p 5433 -U postgres -c 'create database agastyaone_test'
+
+PGHOST=/var/run/postgresql PGPORT=5433 PGUSER=postgres PGDATABASE=agastyaone_test \
+  packages/db/ci/run.sh
+```
+
+`ci/00_bootstrap.sql` reproduces what the Supabase platform provides and the
+migrations assume: the `anon` / `authenticated` / `service_role` /
+`authenticator` roles, enough of the `auth` schema for the provisioning
+trigger, `auth.uid()` reading the same GUC PostgREST sets, a working pgmq with
+real visibility timeouts, and the `search_path` Supabase sets on the `postgres`
+role. It is CI-only and must never be applied to a Supabase project.
+
+The suites themselves (`tests/schema_guards.sql`, `tests/rls_isolation.sql`)
+depend on no extensions, so the identical files also run against the live
+project — `rls_isolation.sql` wraps itself in a transaction and rolls back.
