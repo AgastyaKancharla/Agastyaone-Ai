@@ -308,6 +308,59 @@ select pg_temp.eq(
   0, 'terms: no rating is snapshotted anywhere');
 
 
+-- ===========================================================================
+-- 6. Tenant isolation over the review tables specifically. The generated
+--    policies in 0009 cover these, but "covered by a loop" is not the same as
+--    "asserted", and a client seeing another clinic's patient list would be the
+--    single worst failure this platform could have.
+-- ===========================================================================
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"33333333-0000-4000-8000-000000000003","role":"authenticated"}', true);
+
+select pg_temp.eq((select count(*) from review_sources)::int, 1,
+                  'client A: sees only their own review source');
+select pg_temp.eq((select count(*) from contacts)::int, 2,
+                  'client A: sees their own patients and not tenant B''s');
+select pg_temp.eq((select count(*) from contacts where full_name = 'Other Clinic Patient')::int, 0,
+                  'client A: tenant B''s patient is invisible');
+select pg_temp.eq((select count(*) from review_requests where tenant_id <> 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+                  0, 'client A: no review requests from another tenant');
+-- Clients read their own review data but may not write any of it: the generated
+-- policies require app.is_staff() on every write command.
+--
+-- INSERT and UPDATE/DELETE fail DIFFERENTLY under RLS, and the tests have to
+-- match. A rejected INSERT violates WITH CHECK and raises. A rejected UPDATE or
+-- DELETE simply matches no rows and reports success — RLS filters rather than
+-- refusing. So asserting "it threw" would silently pass on a broken policy that
+-- let the write through and threw for some other reason; asserting the DATA IS
+-- UNCHANGED is the property that actually matters.
+select pg_temp.denied(
+  $q$insert into review_sources (tenant_id, location_id, platform, profile_url)
+     values ('aaaaaaaa-0000-4000-8000-000000000001'::uuid,
+             'cccccccc-0000-4000-8000-000000000001'::uuid,'google','https://evil')$q$,
+  'client A: cannot insert a review source directly');
+
+update review_requests set status = 'reviewed';
+delete from contacts;
+reset role;
+
+-- Checked as a role that can actually see the rows, so a client's own blindness
+-- cannot be mistaken for the write having been blocked.
+select pg_temp.eq((select count(*) from public.review_requests where status = 'reviewed')::int, 0,
+                  'client A: their UPDATE changed nothing');
+select pg_temp.eq((select count(*) from public.contacts)::int, 3,
+                  'client A: their DELETE removed nothing');
+
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"33333333-0000-4000-8000-000000000003","role":"authenticated"}', true);
+
+-- The match-candidate queue is staff-only, even for your own tenant: it names
+-- two patients and says they may be the same person.
+select pg_temp.eq((select count(*) from contact_match_candidates)::int, 0,
+                  'client A: the duplicate queue is staff-only');
+reset role;
+
+
 -- ---------------------------------------------------------------------------
 -- Report
 -- ---------------------------------------------------------------------------
