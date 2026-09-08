@@ -58,7 +58,14 @@ export default async function ClientDetail({
       <PageHeader
         title={tenant.name}
         description={`/${tenant.slug} · ${tenant.vertical}`}
-        action={<Link href="/console/clients" className="btn-secondary">Back</Link>}
+        action={
+          <div className="flex items-center gap-2">
+            <Link href={`/console/clients/${tenantId}/contacts`} className="btn-secondary">
+              Patients
+            </Link>
+            <Link href="/console/clients" className="btn-ghost">Back</Link>
+          </div>
+        }
       />
 
       <div className="p-8 space-y-8">
@@ -84,12 +91,20 @@ export default async function ClientDetail({
                           <span className="font-medium text-sm">{l.name}</span>
                           {l.is_primary && <span className="pill bg-brand-wash text-brand-deep">primary</span>}
                         </div>
-                        <Link
-                          href={`/console/clients/${tenantId}/nap/${l.id}`}
-                          className="text-xs text-brand hover:underline shrink-0"
-                        >
-                          Listings →
-                        </Link>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <Link
+                            href={`/console/clients/${tenantId}/nap/${l.id}`}
+                            className="text-xs text-brand hover:underline"
+                          >
+                            Listings →
+                          </Link>
+                          <Link
+                            href={`/console/clients/${tenantId}/reviews/${l.id}`}
+                            className="text-xs text-brand hover:underline"
+                          >
+                            Reviews →
+                          </Link>
+                        </div>
                       </div>
                       <div className="text-sm text-muted mt-1">
                         {[l.address_line1, l.city, l.pincode].filter(Boolean).join(', ') || 'No address on file'}

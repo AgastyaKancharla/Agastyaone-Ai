@@ -10,12 +10,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agastyaone/db": "*",
+    "@agastyaone/places-client": "*",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.45.4",
     "next": "^15.0.3",
+    "qrcode-generator": "^1.5.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@agastyaone/db": "*"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

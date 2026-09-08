@@ -16,7 +16,7 @@ export const PORTAL_MODULES: { code: string; label: string; icon: string; href: 
   { code: 'call_tracking',        label: 'Calls',          icon: '☎', href: '/portal/calls' },
   { code: 'booking_capture',      label: 'Bookings',       icon: '▣', href: '/portal/bookings' },
   { code: 'crm',                  label: 'Patients',       icon: '◍', href: '/portal/patients' },
-  { code: 'review_automation',    label: 'Reviews',        icon: '★', href: '/portal/reviews' },
+  { code: 'review_automation',    label: 'Reviews',        icon: '★', href: '/portal/reviews', ready: true },
   { code: 'recall',               label: 'Recall',         icon: '↻', href: '/portal/recall' },
   { code: 'reporting',            label: 'Reports',        icon: '▤', href: '/portal/reports' },
 ];
