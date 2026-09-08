@@ -4251,6 +4251,7 @@ export type Database = {
           failure_reason: string | null
           id: string
           location_id: string | null
+          public_token: string | null
           review_id: string | null
           send_after: string | null
           sent_at: string | null
@@ -4266,6 +4267,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           location_id?: string | null
+          public_token?: string | null
           review_id?: string | null
           send_after?: string | null
           sent_at?: string | null
@@ -4281,6 +4283,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           location_id?: string | null
+          public_token?: string | null
           review_id?: string | null
           send_after?: string | null
           sent_at?: string | null
@@ -5855,7 +5858,41 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: boolean
       }
+      create_contact: {
+        Args: {
+          p_consent_evidence?: Json
+          p_consent_source?: string
+          p_email?: string
+          p_full_name: string
+          p_location_id?: string
+          p_phone?: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
+      create_review_source: {
+        Args: {
+          p_external_id?: string
+          p_location_id: string
+          p_platform?: string
+          p_profile_url?: string
+        }
+        Returns: string
+      }
       enqueue_nap_audit: { Args: { p_location_id: string }; Returns: string }
+      import_contacts: {
+        Args: {
+          p_dry_run?: boolean
+          p_location_id?: string
+          p_rows: Json
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      issue_review_request: {
+        Args: { p_channel?: string; p_contact_id: string; p_source_id: string }
+        Returns: Json
+      }
       log_tenant_access: {
         Args: { p_reason?: string; p_tenant_id: string }
         Returns: boolean
@@ -5870,6 +5907,17 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_review_click: { Args: { p_token: string }; Returns: string }
+      set_contact_consent: {
+        Args: {
+          p_channel: string
+          p_contact_id: string
+          p_evidence?: Json
+          p_opted_in: boolean
+          p_source?: string
+        }
+        Returns: boolean
       }
       set_nap_source_of_truth: {
         Args: {
@@ -6019,4 +6067,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
