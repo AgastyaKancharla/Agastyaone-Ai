@@ -156,6 +156,12 @@ insert into metric_definitions (code, name, service_code, unit, description, ver
   ('nap_consistency_score',   'NAP Consistency Score',      'directory_nap', 'score',   'Mean confidence across directories that were successfully checked. Excludes errored directories so a blocked scraper never lowers the score.', 1, true),
   ('nap_coverage_pct',        'Directory Coverage',         'directory_nap', 'percent', 'Share of requested directories that were successfully checked.', 1, true),
   ('nap_issues_open',         'Open NAP Issues',            'directory_nap', 'count',   'Directories currently reporting drift or mismatch.', 1, true),
-  ('nap_listings_found',      'Listings Found',             'directory_nap', 'count',   'Directories where a listing was confidently matched to this location.', 1, true)
+  ('nap_listings_found',      'Listings Found',             'directory_nap', 'count',   'Directories where a listing was confidently matched to this location.', 1, true),
+  -- Review Automation measures the request funnel and nothing else. There is
+  -- deliberately no rating metric: Google's rating may be shown live but not
+  -- stored, and a snapshot row is storage. It arrives with GBP API access.
+  ('review_requests_issued',  'Review Requests Issued',     'review_automation', 'count',   'Review links and QR codes handed to patients that day.', 1, true),
+  ('review_requests_clicked', 'Review Requests Scanned',    'review_automation', 'count',   'How many of that day''s codes were scanned. Counted against the day the code was issued, so a late scan updates that day rather than today.', 1, true),
+  ('review_click_rate',       'Review Scan Rate',           'review_automation', 'percent', 'Share of that day''s issued codes that were scanned. A scan is not a review — Google does not report who posted one.', 1, true)
 on conflict (code, version) do update
   set name = excluded.name, description = excluded.description, is_client_visible = excluded.is_client_visible;

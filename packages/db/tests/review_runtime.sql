@@ -253,6 +253,61 @@ select pg_temp.eq((select count(*) from reviews)::int, 0,
                   'terms: no Places data was written to reviews');
 
 
+-- ===========================================================================
+-- 5. The funnel snapshot. Cohort-based: a scan counts against the day its code
+--    was ISSUED, so a late scan corrects that day rather than today's.
+-- ===========================================================================
+-- At this point exactly one link has been issued and scanned, and one WhatsApp
+-- request is sitting unsent. The unsent one must NOT count as issued: it has
+-- been asked for, not delivered.
+select pg_temp.eq(
+  (select value::int from metric_snapshots
+    where metric_code = 'review_requests_issued'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  1, 'metrics: the unsent WhatsApp request is not counted as issued');
+
+select pg_temp.eq(
+  (select value::int from metric_snapshots
+    where metric_code = 'review_requests_clicked'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  1, 'metrics: the scan was counted');
+
+select pg_temp.eq(
+  (select value from metric_snapshots
+    where metric_code = 'review_click_rate'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  100.00, 'metrics: one issued, one scanned reads as 100%');
+
+-- A second code issued the same day dilutes the rate rather than adding a point.
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"11111111-0000-4000-8000-000000000001","role":"authenticated"}', true);
+select public.issue_review_request('ee000000-0000-4000-8000-000000000002',
+         (select id from review_sources where location_id = 'cccccccc-0000-4000-8000-000000000001'),
+         'link');
+reset role;
+
+select pg_temp.eq(
+  (select value::int from metric_snapshots
+    where metric_code = 'review_requests_issued'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  2, 'metrics: a second code the same day updates the cohort');
+select pg_temp.eq(
+  (select value from metric_snapshots
+    where metric_code = 'review_click_rate'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  50.00, 'metrics: and the rate follows');
+select pg_temp.eq(
+  (select count(*)::int from metric_snapshots
+    where metric_code = 'review_requests_issued'
+      and location_id = 'cccccccc-0000-4000-8000-000000000001'),
+  1, 'metrics: upserted in place, not appended as a duplicate point');
+
+-- No rating metric exists to be written into, by design.
+select pg_temp.eq(
+  (select count(*)::int from metric_snapshots where metric_code like '%rating%'),
+  0, 'terms: no rating is snapshotted anywhere');
+
+
 -- ---------------------------------------------------------------------------
 -- Report
 -- ---------------------------------------------------------------------------
