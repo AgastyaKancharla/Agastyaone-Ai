@@ -43,6 +43,9 @@ $PSQL -f packages/db/tests/rls_isolation.sql || die "tenant isolation failed"
 step "Contacts spine"
 $PSQL -f packages/db/tests/contacts_spine.sql || die "contacts spine failed"
 
+step "Review runtime"
+$PSQL -f packages/db/tests/review_runtime.sql || die "review runtime failed"
+
 # ---------------------------------------------------------------------------
 # A guard that has never failed is not known to work. Each case below breaks
 # exactly one invariant and asserts the guards catch THAT one, then repairs it
