@@ -40,6 +40,9 @@ $PSQL -f packages/db/tests/schema_guards.sql || die "schema guards failed"
 step "Tenant isolation"
 $PSQL -f packages/db/tests/rls_isolation.sql || die "tenant isolation failed"
 
+step "Contacts spine"
+$PSQL -f packages/db/tests/contacts_spine.sql || die "contacts spine failed"
+
 # ---------------------------------------------------------------------------
 # A guard that has never failed is not known to work. Each case below breaks
 # exactly one invariant and asserts the guards catch THAT one, then repairs it
@@ -50,6 +53,10 @@ $PSQL -f packages/db/tests/rls_isolation.sql || die "tenant isolation failed"
 # failure. It did not fail, and it was right not to: the table still had its
 # other policies, and a missing SELECT policy denies reads rather than leaking
 # them. The sabotage has to match what a guard actually claims.
+#
+# EVERY TEST MUST RUN ABOVE THIS LINE. What follows leaves the database with
+# RLS off and no policies on `contacts`, so anything run against it afterwards
+# sees an unprotected schema and will draw the wrong conclusion.
 # ---------------------------------------------------------------------------
 step "Prove each guard can fail"
 
