@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  # A branch with an open PR would otherwise run this twice per push, once for
+  # each event. `pull_request` covers branches under review; `push` covers main.
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, no database. Kept separate so a slow container never delays the
+  # feedback that catches most mistakes.
+  checks:
+    name: Tests, types, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Root script fans out across workspaces, so a new package's tests run
+      # here the moment it exists rather than when someone remembers to add it.
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      # Includes the no-restricted-imports boundary that keeps the service-role
+      # client — which bypasses RLS on every table — out of page components.
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://build-time-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: build-time-placeholder
+
+  # The one that matters. Applies every migration to a throwaway Postgres and
+  # asserts the security model still holds — no production credentials involved.
+  database:
+    name: Schema guards and tenant isolation
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agastyaone_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: agastyaone_test
+      # Any failure anywhere aborts the job rather than scrolling past.
+      PSQL: psql -v ON_ERROR_STOP=1 --no-psqlrc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # Bootstrap, migrations, seeds, schema guards, tenant isolation, and the
+      # sabotage cases that prove each guard detects its own violation. This is
+      # a script rather than a list of steps here so it can be run unchanged
+      # against a throwaway local cluster — otherwise the two drift and a local
+      # run stops being evidence about CI.
+      - name: Apply schema and assert the security model holds
+        run: packages/db/ci/run.sh

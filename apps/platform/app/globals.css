@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * AgastyaOne brand tokens.
+ *   #0E7490 primary   #0B5C6B deep     #EAF4F4 wash    #D7EFEF line
+ *   #F97316 accent    #D97706 deep     #111827 ink     #64748B muted
+ *   #DC2626 danger
+ * Values are space-separated RGB so Tailwind's <alpha-value> works.
+ */
+:root {
+  --brand:      14 116 144;
+  --brand-deep: 11 92 107;
+  --brand-wash: 234 244 244;
+  --brand-line: 215 239 239;
+  --accent:     249 115 22;
+  --accent-deep:217 119 6;
+  --ink:        17 24 39;
+  --muted:      100 116 139;
+  --danger:     220 38 38;
+  --surface:    255 255 255;
+  --canvas:     248 250 251;
+  --hairline:   226 232 240;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+
+.dark {
+  /* Teal lifts and the wash inverts to a tint of the brand rather than grey,
+     so the dark theme still reads as AgastyaOne and not as generic dark mode. */
+  --brand:      45 168 200;
+  --brand-deep: 125 211 226;
+  --brand-wash: 12 42 48;
+  --brand-line: 20 62 70;
+  --accent:     251 146 60;
+  --accent-deep:253 186 116;
+  --ink:        237 242 247;
+  --muted:      148 163 184;
+  --danger:     248 113 113;
+  --surface:    17 24 32;
+  --canvas:     11 16 22;
+  --hairline:   32 43 56;
+  color-scheme: dark;
+}
+
+body { @apply bg-canvas text-ink font-sans antialiased; }
+
+@layer components {
+  .card      { @apply bg-surface border border-hairline rounded-xl shadow-card; }
+  .label     { @apply block text-sm font-medium text-ink mb-1.5; }
+  .hint      { @apply text-xs text-muted mt-1.5; }
+  .input {
+    @apply w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-ink
+           placeholder:text-muted outline-none transition
+           focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm
+           font-medium transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary   { @apply btn bg-brand text-white hover:bg-brand-deep; }
+  .btn-accent    { @apply btn bg-accent text-white hover:bg-accent-deep; }
+  .btn-secondary { @apply btn border border-hairline bg-surface text-ink hover:bg-brand-wash; }
+  .btn-ghost     { @apply btn text-muted hover:text-ink hover:bg-brand-wash; }
+  .pill      { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium; }
+  .th        { @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted; }
+  .td        { @apply px-4 py-3 text-sm text-ink align-middle; }
+}

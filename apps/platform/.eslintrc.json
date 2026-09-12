@@ -1,0 +1,17 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "patterns": [{
+        "group": ["**/lib/supabase/admin", "@/lib/supabase/admin"],
+        "message": "The service-role client bypasses RLS on every table. Import it only from app/api/internal/** (see the override in this config). Use @/lib/supabase/server instead."
+      }]
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["app/api/internal/**/*.ts", "app/api/internal/**/*.tsx"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}
