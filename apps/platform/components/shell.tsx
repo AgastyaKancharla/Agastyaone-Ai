@@ -67,6 +67,9 @@ export function Shell({
             <div className="text-sm font-medium truncate">{user.name}</div>
             <div className="text-xs text-muted truncate">{user.email}</div>
           </div>
+          <Link href="/account" className="btn-ghost w-full justify-start text-sm flex">
+            Change password
+          </Link>
           <form action={signOut}>
             <button type="submit" className="btn-ghost w-full justify-start text-sm">
               Sign out
