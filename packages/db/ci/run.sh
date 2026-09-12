@@ -49,6 +49,9 @@ $PSQL -f packages/db/tests/review_runtime.sql || die "review runtime failed"
 step "NAP compliance"
 $PSQL -f packages/db/tests/nap_compliance.sql || die "NAP compliance failed"
 
+step "Visibility"
+$PSQL -f packages/db/tests/visibility.sql || die "visibility failed"
+
 # ---------------------------------------------------------------------------
 # A guard that has never failed is not known to work. Each case below breaks
 # exactly one invariant and asserts the guards catch THAT one, then repairs it

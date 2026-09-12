@@ -5726,6 +5726,191 @@ export type Database = {
           },
         ]
       }
+      visibility_audits: {
+        Row: {
+          completed_at: string | null
+          composite_score: number | null
+          coverage_pct: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          location_id: string
+          queued_at: string
+          requested_by: string | null
+          service_instance_id: string | null
+          started_at: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          composite_score?: number | null
+          coverage_pct?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          location_id: string
+          queued_at?: string
+          requested_by?: string | null
+          service_instance_id?: string | null
+          started_at?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          composite_score?: number | null
+          coverage_pct?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          location_id?: string
+          queued_at?: string
+          requested_by?: string | null
+          service_instance_id?: string | null
+          started_at?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_audits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_audits_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_audits_service_instance_id_fkey"
+            columns: ["service_instance_id"]
+            isOneToOne: false
+            referencedRelation: "service_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_audits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visibility_pillar_scores: {
+        Row: {
+          audit_id: string
+          created_at: string
+          detail: Json | null
+          id: string
+          measured: boolean
+          pillar: string
+          score: number | null
+          tenant_id: string
+          weight: number
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          measured?: boolean
+          pillar: string
+          score?: number | null
+          tenant_id: string
+          weight: number
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          measured?: boolean
+          pillar?: string
+          score?: number | null
+          tenant_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_pillar_scores_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "visibility_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_pillar_scores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visibility_website_findings: {
+        Row: {
+          audit_id: string
+          id: string
+          kind: string
+          remediation: string | null
+          rule_label: string
+          severity: string | null
+          signal_group: string
+          snippet: string | null
+          tenant_id: string
+        }
+        Insert: {
+          audit_id: string
+          id?: string
+          kind: string
+          remediation?: string | null
+          rule_label: string
+          severity?: string | null
+          signal_group: string
+          snippet?: string | null
+          tenant_id: string
+        }
+        Update: {
+          audit_id?: string
+          id?: string
+          kind?: string
+          remediation?: string | null
+          rule_label?: string
+          severity?: string | null
+          signal_group?: string
+          snippet?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_website_findings_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "visibility_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_website_findings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_events: {
         Row: {
           attempts: number
@@ -5937,6 +6122,10 @@ export type Database = {
         Returns: string
       }
       enqueue_nap_audit: { Args: { p_location_id: string }; Returns: string }
+      enqueue_visibility_audit: {
+        Args: { p_location_id: string }
+        Returns: string
+      }
       import_contacts: {
         Args: {
           p_dry_run?: boolean
@@ -5991,6 +6180,17 @@ export type Database = {
           p_website?: string
         }
         Returns: string
+      }
+      visibility_queue_archive: { Args: { p_msg_id: number }; Returns: boolean }
+      visibility_queue_delete: { Args: { p_msg_id: number }; Returns: boolean }
+      visibility_queue_read: {
+        Args: { p_qty?: number; p_vt?: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
       }
     }
     Enums: {

@@ -104,6 +104,12 @@ export default async function ClientDetail({
                           >
                             Reviews →
                           </Link>
+                          <Link
+                            href={`/console/clients/${tenantId}/visibility/${l.id}`}
+                            className="text-xs text-brand hover:underline"
+                          >
+                            Visibility →
+                          </Link>
                         </div>
                       </div>
                       <div className="text-sm text-muted mt-1">

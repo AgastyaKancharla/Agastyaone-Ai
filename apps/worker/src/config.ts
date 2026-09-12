@@ -23,6 +23,15 @@ export const CONFIG = {
   visibilityTimeoutSec: Number(process.env.WORKER_VISIBILITY_TIMEOUT ?? 300),
   pollIntervalMs: Number(process.env.WORKER_POLL_INTERVAL_MS ?? 5000),
   pageTimeoutMs: Number(process.env.WORKER_PAGE_TIMEOUT_MS ?? 20000),
+
+  /**
+   * Optional. PageSpeed Insights answers unauthenticated at low volume; a key
+   * raises the quota to 25k/day. Absent, the website pillar simply scores on
+   * the signals we read ourselves.
+   */
+  pageSpeedApiKey: process.env.PAGESPEED_API_KEY ?? '',
+  /** Lighthouse runs a real browser server-side, so this is generous. */
+  pageSpeedTimeoutMs: Number(process.env.WORKER_PAGESPEED_TIMEOUT_MS ?? 60000),
   /** Attempts before a job is archived to the dead letter. */
   maxAttempts: Number(process.env.WORKER_MAX_ATTEMPTS ?? 3),
 } as const;

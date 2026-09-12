@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@agastyaone/nap-engine": "*",
+    "@agastyaone/visibility-engine": "*",
     "@supabase/supabase-js": "^2.45.4",
     "playwright-core": "^1.48.0",
     "@agastyaone/db": "*"

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@agastyaone/db/types';
 import type { AuditSummary, DirectoryResult, NmcComplianceResult, SourceOfTruth } from '@agastyaone/nap-engine';
+import type { VisibilityRun } from './visibility.ts';
 import { CONFIG } from './config.ts';
 
 /**
@@ -56,6 +57,77 @@ export async function markFailed(auditId: string, message: string): Promise<void
     .from('nap_audits')
     .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
     .eq('id', auditId);
+}
+
+export async function markVisibilityRunning(auditId: string): Promise<void> {
+  await db
+    .from('visibility_audits')
+    .update({ status: 'running', started_at: new Date().toISOString() })
+    .eq('id', auditId);
+}
+
+export async function markVisibilityFailed(auditId: string, message: string): Promise<void> {
+  await db
+    .from('visibility_audits')
+    .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
+    .eq('id', auditId);
+}
+
+/**
+ * Children first, header last.
+ *
+ * The order is load-bearing: app.snapshot_visibility_metrics() fires on the
+ * transition into 'completed' and reads the pillar rows and findings to
+ * snapshot the website sub-score and the open-issue count. Flipping the status
+ * first would snapshot an audit that had no children yet.
+ */
+export async function saveVisibilityResults(
+  auditId: string,
+  tenantId: string,
+  run: VisibilityRun,
+): Promise<void> {
+  const { error: pillarError } = await db.from('visibility_pillar_scores').upsert(
+    run.composite.pillars.map((p) => ({
+      tenant_id: tenantId,
+      audit_id: auditId,
+      pillar: p.pillar,
+      score: p.score,
+      weight: p.weight,
+      measured: p.measured,
+      detail: p.detail,
+    })),
+    { onConflict: 'audit_id,pillar' },
+  );
+  if (pillarError) throw new Error(`Could not store pillar scores: ${pillarError.message}`);
+
+  if (run.website) {
+    const { error: findingsError } = await db.from('visibility_website_findings').insert(
+      run.website.findings.map((f) => ({
+        tenant_id: tenantId,
+        audit_id: auditId,
+        kind: f.kind,
+        signal_group: f.signalGroup,
+        rule_label: f.ruleLabel,
+        severity: f.severity,
+        snippet: f.snippet,
+        remediation: f.remediation,
+      })),
+    );
+    if (findingsError) throw new Error(`Could not store website findings: ${findingsError.message}`);
+  }
+
+  const { error: auditError } = await db
+    .from('visibility_audits')
+    .update({
+      status: 'completed',
+      composite_score: run.composite.score,
+      coverage_pct: run.composite.coveragePct,
+      website_url: run.websiteUrl,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', auditId);
+
+  if (auditError) throw new Error(`Could not finalise visibility audit: ${auditError.message}`);
 }
 
 /**

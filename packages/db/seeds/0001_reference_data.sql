@@ -89,6 +89,12 @@ insert into service_catalog (code, name, category, description, is_bundle, billi
   ('gbp_management',     'GBP Management',             'presence',    'Google Business Profile optimisation, posts, categories and Q&A.',                                                                false, 'monthly',  '998361', 18.00, 21),
   ('directory_nap',      'Directory & NAP Consistency','presence',    'Listing coverage and Name/Address/Phone consistency auditing and correction.',                                                    false, 'monthly',  '998361', 18.00, 22),
   ('geo',                'GEO (AI Search Visibility)', 'presence',    'Visibility inside AI answer engines — ChatGPT, Perplexity, Gemini — tracked by prompt and share of voice.',                        false, 'monthly',  '998361', 18.00, 30),
+  -- Sits above the individual presence lines rather than beside them: it scores
+  -- map rank, website, citations, reviews, AI visibility and backlinks into one
+  -- number. Deliberately not a bundle — a bundle grants its components, whereas
+  -- this measures them whether or not the client buys them, which is precisely
+  -- what makes it sellable to a clinic buying nothing else yet.
+  ('visibility',         'Digital Visibility',         'insight',     'One 0–100 visibility score per location — map rank, website, citations, reviews, AI answer engines and backlinks — trended monthly.', false, 'monthly',  '998313', 18.00, 31),
   ('front_desk',         'Front Desk Bundle',          'engagement',  'WhatsApp automation, AI receptionist, missed-call recovery and a unified inbox.',                                                  true,  'monthly',  '998313', 18.00, 40),
   ('whatsapp_automation','WhatsApp Automation',        'engagement',  'Automated WhatsApp conversations and templates.',                                                                                 false, 'monthly',  '998313', 18.00, 41),
   ('ai_receptionist',    'AI Receptionist',            'engagement',  'AI front desk answering enquiries and handing off to staff.',                                                                      false, 'monthly',  '998313', 18.00, 42),
@@ -162,6 +168,13 @@ insert into metric_definitions (code, name, service_code, unit, description, ver
   -- stored, and a snapshot row is storage. It arrives with GBP API access.
   ('review_requests_issued',  'Review Requests Issued',     'review_automation', 'count',   'Review links and QR codes handed to patients that day.', 1, true),
   ('review_requests_clicked', 'Review Requests Scanned',    'review_automation', 'count',   'How many of that day''s codes were scanned. Counted against the day the code was issued, so a late scan updates that day rather than today.', 1, true),
-  ('review_click_rate',       'Review Scan Rate',           'review_automation', 'percent', 'Share of that day''s issued codes that were scanned. A scan is not a review — Google does not report who posted one.', 1, true)
+  ('review_click_rate',       'Review Scan Rate',           'review_automation', 'percent', 'Share of that day''s issued codes that were scanned. A scan is not a review — Google does not report who posted one.', 1, true),
+  -- Digital Visibility. The composite and its coverage always travel together:
+  -- a score of 71 means something different at 100% coverage than at 40%, and
+  -- showing one without the other invites a conclusion the data cannot support.
+  ('visibility_score',        'Digital Visibility Score',   'visibility', 'score',   'Weighted mean across the pillars that could be measured — map rank, website, citations, reviews, AI answer engines, backlinks. Unmeasured pillars are excluded and the remaining weights re-normalised, so an unreachable source never reads as a low score.', 1, true),
+  ('visibility_coverage_pct', 'Visibility Coverage',        'visibility', 'percent', 'Share of the scoring model''s total weight that was actually measured on this run.', 1, true),
+  ('visibility_website_score','Website Visibility Score',   'visibility', 'score',   'The website pillar on its own — search, AI-answer and answer-engine readiness of the clinic''s own site.', 1, true),
+  ('visibility_issues_open',  'Open Visibility Issues',     'visibility', 'count',   'Website findings currently classed as issues rather than opportunities.', 1, true)
 on conflict (code, version) do update
   set name = excluded.name, description = excluded.description, is_client_visible = excluded.is_client_visible;
