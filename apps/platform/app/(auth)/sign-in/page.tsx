@@ -36,7 +36,7 @@ export default async function SignInPage() {
           </div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="text-sm text-muted mt-1.5">
-            Clients sign in with an email link. Team members can use a password.
+            Sign in with your team password.
           </p>
           <div className="mt-8">
             <SignInForm />

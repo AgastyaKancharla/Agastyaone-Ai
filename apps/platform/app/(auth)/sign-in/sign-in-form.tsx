@@ -5,8 +5,14 @@ import { signInWithMagicLink, signInWithPassword, type SignInState } from './act
 
 const initial: SignInState = {};
 
+// Off for now: Supabase's shared free-tier email sender rate-limits fast,
+// which blocked sign-in entirely during early solo testing. Password auth
+// doesn't touch email at all. Flip back on once real SMTP is configured --
+// a client with no password has no other way in.
+const MAGIC_LINK_ENABLED = false;
+
 export default function SignInForm() {
-  const [mode, setMode] = useState<'link' | 'password'>('link');
+  const [mode, setMode] = useState<'link' | 'password'>(MAGIC_LINK_ENABLED ? 'link' : 'password');
   const [linkState, linkAction, linkPending] = useActionState(signInWithMagicLink, initial);
   const [pwState, pwAction, pwPending] = useActionState(signInWithPassword, initial);
 
@@ -29,21 +35,23 @@ export default function SignInForm() {
 
   return (
     <div>
-      <div role="tablist" className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-brand-wash mb-6">
-        {(['link', 'password'] as const).map((m) => (
-          <button
-            key={m}
-            role="tab"
-            aria-selected={mode === m}
-            onClick={() => setMode(m)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              mode === m ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'
-            }`}
-          >
-            {m === 'link' ? 'Email link' : 'Password'}
-          </button>
-        ))}
-      </div>
+      {MAGIC_LINK_ENABLED && (
+        <div role="tablist" className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-brand-wash mb-6">
+          {(['link', 'password'] as const).map((m) => (
+            <button
+              key={m}
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                mode === m ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {m === 'link' ? 'Email link' : 'Password'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form action={mode === 'link' ? linkAction : pwAction} className="space-y-4">
         <div>
@@ -85,7 +93,9 @@ export default function SignInForm() {
       <p className="hint text-center mt-6">
         {mode === 'link'
           ? 'No password needed — we email you a one-time link.'
-          : 'Team accounts only. Clients should use the email link.'}
+          : MAGIC_LINK_ENABLED
+            ? 'Team accounts only. Clients should use the email link.'
+            : 'Team sign-in.'}
       </p>
     </div>
   );
