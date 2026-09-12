@@ -7,6 +7,12 @@ import { PORTAL_MODULES } from '@/lib/modules';
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/sign-in');
+  // Staff who land here directly (bookmark, stale tab, back button) belong in
+  // the Console. Without this, a staff account's tenant_scope='all' makes
+  // session.tenants[0] resolve to the internal AgastyaOne tenant instead of
+  // "no account linked" — a confusing, empty-looking Portal instead of a
+  // bounce to where they actually work.
+  if (session.workspace !== 'portal') redirect('/console');
 
   // A client's tenant comes from their membership, already filtered by RLS.
   const tenant = session.tenants[0];
