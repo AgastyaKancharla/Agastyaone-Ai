@@ -1,8 +1,8 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { siteOrigin } from '@/lib/site';
 
 export type SignInState = { error?: string; sent?: boolean };
 
@@ -37,7 +37,10 @@ export async function signInWithMagicLink(
   const email = String(formData.get('email') ?? '').trim();
   if (!email) return { error: 'Enter your email address.' };
 
-  const origin = (await headers()).get('origin') ?? '';
+  // Same helper every other outbound link uses. The raw `origin` header is not
+  // always present on a Server Action POST, and an empty one makes this a
+  // relative URL that Supabase discards in favour of the project's Site URL.
+  const origin = await siteOrigin();
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
