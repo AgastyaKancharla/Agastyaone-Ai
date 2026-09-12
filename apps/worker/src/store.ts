@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@agastyaone/db/types';
-import type { AuditSummary, DirectoryResult, SourceOfTruth } from '@agastyaone/nap-engine';
+import type { AuditSummary, DirectoryResult, NmcComplianceResult, SourceOfTruth } from '@agastyaone/nap-engine';
 import { CONFIG } from './config.ts';
 
 /**
@@ -71,6 +71,7 @@ export async function saveResults(
   tenantId: string,
   results: DirectoryResult[],
   summary: AuditSummary,
+  compliance: NmcComplianceResult | null,
 ): Promise<void> {
   const dirIds = await getDirectoryIds();
 
@@ -118,6 +119,23 @@ export async function saveResults(
     }
   }
 
+  // Same relational-not-blob rule as nap_field_diffs: one row per finding, so
+  // "which clients are missing a privacy policy this month" is a query.
+  if (compliance) {
+    const { error: findingsError } = await db.from('nap_compliance_findings').insert(
+      compliance.findings.map((f) => ({
+        tenant_id: tenantId,
+        audit_id: auditId,
+        kind: f.kind,
+        rule_label: f.ruleLabel,
+        severity: f.severity,
+        snippet: f.snippet,
+        remediation: f.remediation,
+      })),
+    );
+    if (findingsError) throw new Error(`Could not store compliance findings: ${findingsError.message}`);
+  }
+
   const { error: auditError } = await db
     .from('nap_audits')
     .update({
@@ -131,6 +149,9 @@ export async function saveResults(
       ambiguous_count: summary.ambiguousCount,
       audit_score: summary.auditScore,
       coverage_pct: summary.coveragePct,
+      website_checked_for_compliance: compliance !== null,
+      compliance_score: compliance?.score ?? null,
+      is_compliant: compliance?.isCompliant ?? null,
       completed_at: new Date().toISOString(),
     })
     .eq('id', auditId);

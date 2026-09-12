@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/shell';
-import { AuditStatusPill } from '@/components/nap';
+import { AuditStatusPill, ComplianceScorePill } from '@/components/nap';
 import { RunAuditButton, SourceOfTruthForm } from './nap-forms';
 
 export default async function LocationNapPage({
@@ -32,11 +32,20 @@ export default async function LocationNapPage({
       .maybeSingle(),
     supabase
       .from('nap_audits')
-      .select('id, status, audit_score, coverage_pct, directories_checked, directories_errored, consistent_count, drift_count, inconsistent_count, not_found_count, ambiguous_count, created_at, error_message')
+      .select('id, status, audit_score, coverage_pct, directories_checked, directories_errored, consistent_count, drift_count, inconsistent_count, not_found_count, ambiguous_count, created_at, error_message, website_checked_for_compliance, compliance_score, is_compliant')
       .eq('location_id', locationId)
       .order('created_at', { ascending: false })
       .limit(10),
   ]);
+
+  const latest = audits?.[0];
+  const { data: complianceFindings } = latest?.website_checked_for_compliance
+    ? await supabase
+        .from('nap_compliance_findings')
+        .select('kind, rule_label, severity, snippet, remediation')
+        .eq('audit_id', latest.id)
+        .order('kind')
+    : { data: null };
 
   return (
     <>
@@ -48,6 +57,48 @@ export default async function LocationNapPage({
 
       <div className="p-8 space-y-8 max-w-4xl">
         <SourceOfTruthForm tenantId={tenantId} locationId={locationId} sot={sot ?? null} />
+
+        <section className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-hairline flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-medium">Website compliance</h2>
+              <p className="hint">NMC/DCI healthcare-advertising rules, checked on the homepage.</p>
+            </div>
+            {latest?.website_checked_for_compliance && (
+              <ComplianceScorePill score={latest.compliance_score} isCompliant={latest.is_compliant} />
+            )}
+          </div>
+          {!latest?.website_checked_for_compliance ? (
+            <p className="px-6 py-8 text-sm text-muted">
+              {sot?.website
+                ? 'Not checked yet — the next audit run will include it.'
+                : 'No website on file for this location, so nothing to check yet.'}
+            </p>
+          ) : (
+            (() => {
+              const attention = (complianceFindings ?? []).filter((f) => f.kind !== 'disclosure_present');
+              if (attention.length === 0) {
+                return <p className="px-6 py-4 text-sm text-muted">No issues found on the last check.</p>;
+              }
+              return (
+                <div className="divide-y divide-hairline">
+                  {attention.map((f, i) => (
+                    <div key={i} className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`pill ${f.kind === 'violation' ? 'bg-danger/10 text-danger' : 'bg-accent/10 text-accent-deep'}`}>
+                          {f.kind === 'violation' ? 'violation' : 'missing'}
+                        </span>
+                        <span className="text-sm font-medium">{f.rule_label}</span>
+                      </div>
+                      {f.snippet && <p className="hint mt-1">Found on the page: &ldquo;{f.snippet}&rdquo;</p>}
+                      {f.remediation && <p className="hint">{f.remediation}</p>}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
+        </section>
 
         <section className="card overflow-hidden">
           <div className="px-6 py-4 border-b border-hairline">

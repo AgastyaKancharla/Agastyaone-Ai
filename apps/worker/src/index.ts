@@ -32,14 +32,15 @@ async function handle(job: QueueMessage): Promise<void> {
   try {
     await markRunning(audit_id);
     const source = await loadSourceOfTruth(sot_id);
-    const { results, summary } = await runAudit(source);
-    await saveResults(audit_id, tenant_id, results, summary);
+    const { results, summary, compliance } = await runAudit(source);
+    await saveResults(audit_id, tenant_id, results, summary, compliance);
 
     await db.rpc('nap_queue_delete', { p_msg_id: job.msg_id });
     console.log(
       `[audit ${audit_id.slice(0, 8)}] done in ${Date.now() - started}ms — ` +
         `score ${summary.auditScore ?? 'n/a'}, coverage ${summary.coveragePct}%, ` +
-        `${summary.directoriesErrored} errored`,
+        `${summary.directoriesErrored} errored` +
+        (compliance ? `, compliance ${compliance.score} (${compliance.isCompliant ? 'ok' : 'flagged'})` : ''),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

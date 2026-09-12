@@ -3195,6 +3195,7 @@ export type Database = {
           ambiguous_count: number
           audit_score: number | null
           completed_at: string | null
+          compliance_score: number | null
           consistent_count: number
           coverage_pct: number | null
           created_at: string
@@ -3205,6 +3206,7 @@ export type Database = {
           error_message: string | null
           id: string
           inconsistent_count: number
+          is_compliant: boolean | null
           location_id: string
           not_found_count: number
           queued_at: string
@@ -3215,11 +3217,13 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          website_checked_for_compliance: boolean
         }
         Insert: {
           ambiguous_count?: number
           audit_score?: number | null
           completed_at?: string | null
+          compliance_score?: number | null
           consistent_count?: number
           coverage_pct?: number | null
           created_at?: string
@@ -3230,6 +3234,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           inconsistent_count?: number
+          is_compliant?: boolean | null
           location_id: string
           not_found_count?: number
           queued_at?: string
@@ -3240,11 +3245,13 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          website_checked_for_compliance?: boolean
         }
         Update: {
           ambiguous_count?: number
           audit_score?: number | null
           completed_at?: string | null
+          compliance_score?: number | null
           consistent_count?: number
           coverage_pct?: number | null
           created_at?: string
@@ -3255,6 +3262,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           inconsistent_count?: number
+          is_compliant?: boolean | null
           location_id?: string
           not_found_count?: number
           queued_at?: string
@@ -3265,6 +3273,7 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          website_checked_for_compliance?: boolean
         }
         Relationships: [
           {
@@ -3297,6 +3306,54 @@ export type Database = {
           },
           {
             foreignKeyName: "nap_audits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nap_compliance_findings: {
+        Row: {
+          audit_id: string
+          id: string
+          kind: string
+          remediation: string | null
+          rule_label: string
+          severity: string | null
+          snippet: string | null
+          tenant_id: string
+        }
+        Insert: {
+          audit_id: string
+          id?: string
+          kind: string
+          remediation?: string | null
+          rule_label: string
+          severity?: string | null
+          snippet?: string | null
+          tenant_id: string
+        }
+        Update: {
+          audit_id?: string
+          id?: string
+          kind?: string
+          remediation?: string | null
+          rule_label?: string
+          severity?: string | null
+          snippet?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nap_compliance_findings_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "nap_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nap_compliance_findings_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

@@ -3,7 +3,13 @@ import { getSession } from '@/lib/session';
 import { getEntitlements, isEntitled } from '@/lib/entitlements';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader, EmptyState } from '@/components/shell';
-import { AuditStatusPill, ScoreHero, ScoreSparkline } from '@/components/nap';
+import { AuditStatusPill, ComplianceScorePill, ScoreHero, ScoreSparkline } from '@/components/nap';
+
+/** Plain language for what kind of compliance finding this is -- action, not citation. */
+const COMPLIANCE_KIND_MEANING: Record<string, string> = {
+  violation: "Something on your website makes a claim regulators don't allow.",
+  missing_disclosure: "Something patients expect to see on a healthcare website isn't visible yet.",
+};
 
 /** What each verdict means to the CLIENT — action, not jargon. */
 const CLIENT_MEANING: Record<string, { label: string; detail: string }> = {
@@ -29,7 +35,7 @@ export default async function PortalListings() {
 
   const { data: audits } = await supabase
     .from('nap_audits')
-    .select('id, location_id, status, audit_score, coverage_pct, directories_errored, completed_at, tenant_locations ( name )')
+    .select('id, location_id, status, audit_score, coverage_pct, directories_errored, completed_at, website_checked_for_compliance, compliance_score, is_compliant, tenant_locations ( name )')
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
     .limit(12);
@@ -50,7 +56,7 @@ export default async function PortalListings() {
     );
   }
 
-  const [{ data: results }, { data: snapshots }] = await Promise.all([
+  const [{ data: results }, { data: snapshots }, { data: complianceFindings }] = await Promise.all([
     supabase
       .from('nap_audit_results')
       .select('id, directory_code, status, listing_url, nap_field_diffs ( field_name, source_value, found_value, match_status, notes )')
@@ -63,6 +69,14 @@ export default async function PortalListings() {
       .eq('location_id', latest.location_id)
       .order('period_start', { ascending: true })
       .limit(24),
+    latest.website_checked_for_compliance
+      ? supabase
+          .from('nap_compliance_findings')
+          .select('kind, rule_label, remediation')
+          .eq('audit_id', latest.id)
+          .neq('kind', 'disclosure_present')
+          .order('kind')
+      : Promise.resolve({ data: null }),
   ]);
 
   const points = (snapshots ?? []).map((s) => ({ date: s.period_start as string, value: Number(s.value) }));
@@ -100,6 +114,30 @@ export default async function PortalListings() {
             <div className="text-sm text-muted mt-1">Could not be read</div>
           </div>
         </div>
+
+        {latest.website_checked_for_compliance && (
+          <section className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-hairline flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-medium">Website compliance</h2>
+                <p className="hint">Healthcare-advertising rules, checked on your homepage.</p>
+              </div>
+              <ComplianceScorePill score={latest.compliance_score} isCompliant={latest.is_compliant} />
+            </div>
+            {(complianceFindings ?? []).length === 0 ? (
+              <p className="px-6 py-4 text-sm text-muted">Nothing here needs attention.</p>
+            ) : (
+              <div className="divide-y divide-hairline">
+                {(complianceFindings ?? []).map((f, i) => (
+                  <div key={i} className="px-6 py-4">
+                    <p className="text-sm">{COMPLIANCE_KIND_MEANING[f.kind] ?? f.rule_label}</p>
+                    {f.remediation && <p className="hint mt-1">{f.remediation}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <ScoreSparkline points={points} />
 

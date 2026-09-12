@@ -1,5 +1,23 @@
 /** Shared presentation for audit results, used by both the location page and the audit detail. */
 
+import { StatusPill } from './shell';
+
+/** Score plus verdict, identical in the Console and the Portal — only the findings list below it differs in tone. */
+export function ComplianceScorePill({
+  score,
+  isCompliant,
+}: {
+  score: number | null;
+  isCompliant: boolean | null;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-2xl font-semibold tabular-nums">{score ?? '—'}</span>
+      <StatusPill status={isCompliant === null ? 'unknown' : isCompliant ? 'green' : 'red'} />
+    </div>
+  );
+}
+
 export function AuditStatusPill({ status }: { status: string }) {
   const tone: Record<string, string> = {
     consistent:   'bg-brand-wash text-brand-deep',
