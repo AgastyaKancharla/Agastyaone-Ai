@@ -4,6 +4,7 @@ import type { AuditSummary, DirectoryResult, NmcComplianceResult, SourceOfTruth 
 import type { VisibilityRun } from './visibility.ts';
 import { rollupCompetitors, type PointResult, type ScanRun, type ScanTarget } from './mapRank.ts';
 import type { GeoRunOutcome, GeoRunTarget } from './geoVisibility.ts';
+import type { BacklinksCheckOutcome, BacklinksCheckTarget } from './backlinks.ts';
 import { CONFIG } from './config.ts';
 
 /**
@@ -361,6 +362,82 @@ export async function loadLatestMapScanScores(locationId: string): Promise<numbe
     latestByKeyword.set(row.keyword, Number(row.score));
   }
   return [...latestByKeyword.values()];
+}
+
+export async function loadBacklinksCheckTarget(checkId: string): Promise<BacklinksCheckTarget> {
+  const { data, error } = await db
+    .from('backlinks_checks')
+    .select('id, tenant_id, location_id, domain')
+    .eq('id', checkId)
+    .single();
+
+  if (error || !data) throw new Error(`Backlinks check ${checkId} not found: ${error?.message}`);
+
+  return { checkId: data.id, tenantId: data.tenant_id, locationId: data.location_id, domain: data.domain };
+}
+
+export async function markBacklinksCheckFailed(checkId: string, message: string): Promise<void> {
+  await db
+    .from('backlinks_checks')
+    .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
+    .eq('id', checkId);
+}
+
+export async function saveBacklinksCheckResult(
+  checkId: string,
+  outcome: BacklinksCheckOutcome,
+): Promise<void> {
+  if (outcome.status !== 'completed' || !outcome.summary) {
+    await db
+      .from('backlinks_checks')
+      .update({
+        status: 'failed',
+        provider_code: outcome.providerCode,
+        error_message: (outcome.errorMessage ?? outcome.status).slice(0, 2000),
+        cost_micros: outcome.costMicros,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', checkId);
+    return;
+  }
+
+  const { summary } = outcome;
+  const { error } = await db
+    .from('backlinks_checks')
+    .update({
+      status: 'completed',
+      provider_code: outcome.providerCode,
+      referring_domains: summary.referringDomains,
+      total_backlinks: summary.totalBacklinks,
+      broken_backlinks: summary.brokenBacklinks,
+      spam_score: summary.spamScore,
+      domain_rank: summary.domainRank,
+      score: outcome.score,
+      cost_micros: outcome.costMicros,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', checkId);
+
+  if (error) throw new Error(`Could not finalise backlinks check: ${error.message}`);
+}
+
+/**
+ * The latest completed check's score for this location. Only one check per
+ * location makes sense at a time (there is no keyword or prompt to vary by,
+ * unlike map rank or AI visibility), so this is the single latest row rather
+ * than a dedupe-by-key loop.
+ */
+export async function loadLatestBacklinksScore(locationId: string): Promise<number | null> {
+  const { data } = await db
+    .from('backlinks_checks')
+    .select('score')
+    .eq('location_id', locationId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.score !== undefined && data?.score !== null ? Number(data.score) : null;
 }
 
 export async function markVisibilityRunning(auditId: string): Promise<void> {

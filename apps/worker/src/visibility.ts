@@ -10,7 +10,7 @@ import { computeAiVisibilityScore, type EngineRun } from '@agastyaone/ai-visibil
 import type { JsonObject } from '@agastyaone/visibility-engine';
 import { browserPool } from './browser.ts';
 import { CONFIG } from './config.ts';
-import { db, loadLatestGeoRuns, loadLatestMapScanScores } from './store.ts';
+import { db, loadLatestBacklinksScore, loadLatestGeoRuns, loadLatestMapScanScores } from './store.ts';
 
 export interface VisibilityRun {
   composite: CompositeResult;
@@ -180,6 +180,18 @@ async function mapRankPillar(locationId: string): Promise<{ score: number | null
   return { score, detail: { keywordsConsidered: scores.length } };
 }
 
+/**
+ * Backlinks pillar, from whatever check already exists. A read, not a
+ * trigger, for the same reason as map rank and AI visibility: a backlinks
+ * check is a paid, cost-bearing lookup that runs on its own manual cadence,
+ * not something a page-fetch-speed audit should wait on or re-trigger.
+ */
+async function backlinksPillar(locationId: string): Promise<{ score: number | null; detail: JsonObject }> {
+  const score = await loadLatestBacklinksScore(locationId);
+  if (score === null) return { score: null, detail: { reason: 'no completed check yet' } };
+  return { score, detail: {} };
+}
+
 async function reviewsPillar(locationId: string): Promise<number | null> {
   const { data } = await db
     .from('metric_snapshots')
@@ -199,12 +211,13 @@ export async function runVisibilityAudit(
 ): Promise<VisibilityRun> {
   const url = websiteUrl ? toNavigableUrl(websiteUrl) : null;
 
-  const [website, citations, reviews, aiVisibility, mapRank] = await Promise.all([
+  const [website, citations, reviews, aiVisibility, mapRank, backlinks] = await Promise.all([
     url ? analyseHomepage(url) : Promise.resolve(null),
     citationsPillar(locationId),
     reviewsPillar(locationId),
     aiVisibilityPillar(locationId),
     mapRankPillar(locationId),
+    backlinksPillar(locationId),
   ]);
 
   const pillars: PillarInput[] = [
@@ -219,9 +232,7 @@ export async function runVisibilityAudit(
     { pillar: 'reviews', score: reviews, detail: { basis: 'review request scan rate' } },
     { pillar: 'ai_visibility', score: aiVisibility.score, detail: aiVisibility.detail },
     { pillar: 'map_rank', score: mapRank.score, detail: mapRank.detail },
-    // Not built yet. Recorded as unmeasured so the client can see what is
-    // still coming rather than wondering why a six-pillar score shows five.
-    { pillar: 'backlinks', score: null, detail: { reason: 'not measured yet' } },
+    { pillar: 'backlinks', score: backlinks.score, detail: backlinks.detail },
   ];
 
   return { composite: compositeScore(pillars), website, websiteUrl: url };

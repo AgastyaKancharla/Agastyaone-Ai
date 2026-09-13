@@ -184,6 +184,10 @@ insert into metric_definitions (code, name, service_code, unit, description, ver
   -- AI answer engines. Trended only at visibility-audit time, same discipline
   -- as the website pillar — geo_runs itself is too granular an event to chart
   -- point-by-point (see migration 0029).
-  ('visibility_ai_score',     'AI Answer Engine Score',     'visibility', 'score',   'Weighted visibility across ChatGPT, Perplexity, Gemini and Claude, weighted top-heavily because most patients act on the first name an assistant gives them.', 1, true)
+  ('visibility_ai_score',     'AI Answer Engine Score',     'visibility', 'score',   'Weighted visibility across ChatGPT, Perplexity, Gemini and Claude, weighted top-heavily because most patients act on the first name an assistant gives them.', 1, true),
+  -- Backlinks. Trended only at visibility-audit time, same discipline as
+  -- ai_visibility and website — a single summary check per location has no
+  -- richer event boundary of its own worth a dedicated trigger.
+  ('visibility_backlinks_score', 'Backlinks Score',         'visibility', 'score',   'Referring-domain strength of the clinic''s own website, log-scaled toward a realistic single-location benchmark and penalised for a visibly spammy link profile.', 1, true)
 on conflict (code, version) do update
   set name = excluded.name, description = excluded.description, is_client_visible = excluded.is_client_visible;

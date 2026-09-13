@@ -122,6 +122,12 @@ export default async function ClientDetail({
                           >
                             AI Visibility →
                           </Link>
+                          <Link
+                            href={`/console/clients/${tenantId}/backlinks/${l.id}`}
+                            className="text-xs text-brand hover:underline"
+                          >
+                            Backlinks →
+                          </Link>
                         </div>
                       </div>
                       <div className="text-sm text-muted mt-1">

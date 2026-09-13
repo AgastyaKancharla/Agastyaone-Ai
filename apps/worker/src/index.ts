@@ -4,13 +4,16 @@ import { runAudit } from './audit.ts';
 import { runVisibilityAudit } from './visibility.ts';
 import { planScan, runMapScan, selectProvider } from './mapRank.ts';
 import { runGeoCheck } from './geoVisibility.ts';
+import { runBacklinksCheck } from './backlinks.ts';
 import {
   db,
   finaliseMapScan,
+  loadBacklinksCheckTarget,
   loadCompletedPoints,
   loadGeoRunTarget,
   loadScanTarget,
   loadSourceOfTruth,
+  markBacklinksCheckFailed,
   markFailed,
   markGeoRunFailed,
   markMapScanFailed,
@@ -18,6 +21,7 @@ import {
   markRunning,
   markVisibilityFailed,
   markVisibilityRunning,
+  saveBacklinksCheckResult,
   saveGeoRunResult,
   saveResults,
   saveScanPoint,
@@ -46,16 +50,23 @@ type GeoMessage = {
   prompt: string;
   engine: string;
 };
+type BacklinksMessage = {
+  check_id: string;
+  tenant_id: string;
+  location_id: string;
+  domain: string;
+};
 
 /**
- * One worker process, four queues.
+ * One worker process, five queues.
  *
  * Separate queues rather than a job-type column on one, because each has a
  * genuinely different shape: a NAP audit crawls five directories on a shared
  * browser, a visibility audit reads one page and waits on Lighthouse, a map
- * scan makes 81 paced, cost-bearing lookups over several minutes, and a geo
- * check is a single, fast LLM call. A slow one of any kind must not sit in
- * front of the others, and they need different visibility timeouts.
+ * scan makes 81 paced, cost-bearing lookups over several minutes, a geo check
+ * is a single, fast LLM call, and a backlinks check is a single, fast summary
+ * lookup. A slow one of any kind must not sit in front of the others, and
+ * they need different visibility timeouts.
  */
 interface Pipeline<M> {
   label: string;
@@ -218,6 +229,41 @@ const geoPipeline: Pipeline<GeoMessage> = {
   },
 };
 
+const backlinksPipeline: Pipeline<BacklinksMessage> = {
+  label: 'backlinks',
+  async claim() {
+    const { data, error } = await db.rpc('backlinks_queue_read', { p_vt: 120, p_qty: 1 });
+    if (error) throw new Error(`Queue read failed: ${error.message}`);
+    return (data as unknown as Job<BacklinksMessage>[] | null)?.[0] ?? null;
+  },
+  auditId: (job) => job.message.check_id,
+  async run(job) {
+    const target = await loadBacklinksCheckTarget(job.message.check_id);
+    const outcome = await runBacklinksCheck(target);
+    await saveBacklinksCheckResult(target.checkId, outcome);
+
+    if (outcome.status !== 'completed') {
+      // Same reasoning as the geo pipeline: a rate limit or a domain the
+      // provider has no data for is a real, recorded outcome, not a bug in
+      // this job worth pgmq's retry machinery.
+      return `${target.domain} did not complete: ${outcome.errorMessage}`;
+    }
+    const s = outcome.summary!;
+    return (
+      `${target.domain} via ${outcome.providerCode} — score ${outcome.score ?? 'n/a'}, ` +
+      `${s.referringDomains} referring domains, ${s.totalBacklinks} backlinks` +
+      (s.spamScore !== null ? `, spam score ${s.spamScore}` : '')
+    );
+  },
+  async complete(job) {
+    await db.rpc('backlinks_queue_delete', { p_msg_id: job.msg_id });
+  },
+  async giveUp(job, message) {
+    await markBacklinksCheckFailed(job.message.check_id, message);
+    await db.rpc('backlinks_queue_archive', { p_msg_id: job.msg_id });
+  },
+};
+
 async function handle<M>(pipeline: Pipeline<M>, job: Job<M>): Promise<void> {
   const id = pipeline.auditId(job).slice(0, 8);
   const tag = `[${pipeline.label} ${id}]`;
@@ -271,12 +317,18 @@ async function claimAny(): Promise<boolean> {
     worked = true;
   }
 
+  const backlinksJob = await backlinksPipeline.claim();
+  if (backlinksJob) {
+    await handle(backlinksPipeline, backlinksJob);
+    worked = true;
+  }
+
   return worked;
 }
 
 async function main(): Promise<void> {
   console.log(
-    `AgastyaOne audit worker starting — queues: nap, visibility, map, geo — ` +
+    `AgastyaOne audit worker starting — queues: nap, visibility, map, geo, backlinks — ` +
       `concurrency ${CONFIG.concurrency}, visibility ${CONFIG.visibilityTimeoutSec}s, ` +
       (CONFIG.playwrightWsEndpoint ? 'remote browser' : 'local Chromium'),
   );

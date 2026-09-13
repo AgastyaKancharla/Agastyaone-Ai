@@ -5,7 +5,6 @@
 // Mirrors the live schema of the AgastyaOne Platform Supabase project. The
 // Supabase clients are parameterised with this, so a query naming a column that
 // does not exist is a compile error rather than a runtime surprise.
-
 export type Json =
   | string
   | number
@@ -505,6 +504,94 @@ export type Database = {
           },
           {
             foreignKeyName: "automation_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      backlinks_checks: {
+        Row: {
+          broken_backlinks: number | null
+          completed_at: string | null
+          cost_micros: number
+          created_at: string
+          domain: string
+          domain_rank: number | null
+          error_message: string | null
+          id: string
+          location_id: string
+          provider_code: string | null
+          referring_domains: number | null
+          requested_by: string | null
+          score: number | null
+          spam_score: number | null
+          started_at: string | null
+          status: string
+          tenant_id: string
+          total_backlinks: number | null
+          updated_at: string
+        }
+        Insert: {
+          broken_backlinks?: number | null
+          completed_at?: string | null
+          cost_micros?: number
+          created_at?: string
+          domain: string
+          domain_rank?: number | null
+          error_message?: string | null
+          id?: string
+          location_id: string
+          provider_code?: string | null
+          referring_domains?: number | null
+          requested_by?: string | null
+          score?: number | null
+          spam_score?: number | null
+          started_at?: string | null
+          status?: string
+          tenant_id: string
+          total_backlinks?: number | null
+          updated_at?: string
+        }
+        Update: {
+          broken_backlinks?: number | null
+          completed_at?: string | null
+          cost_micros?: number
+          created_at?: string
+          domain?: string
+          domain_rank?: number | null
+          error_message?: string | null
+          id?: string
+          location_id?: string
+          provider_code?: string | null
+          referring_domains?: number | null
+          requested_by?: string | null
+          score?: number | null
+          spam_score?: number | null
+          started_at?: string | null
+          status?: string
+          tenant_id?: string
+          total_backlinks?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backlinks_checks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backlinks_checks_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backlinks_checks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -6439,6 +6526,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backlinks_queue_archive: { Args: { p_msg_id: number }; Returns: boolean }
+      backlinks_queue_delete: { Args: { p_msg_id: number }; Returns: boolean }
+      backlinks_queue_read: {
+        Args: { p_qty?: number; p_vt?: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
+      }
       complete_client_action_item: {
         Args: { p_item_id: string }
         Returns: boolean
@@ -6462,6 +6560,10 @@ export type Database = {
           p_platform?: string
           p_profile_url?: string
         }
+        Returns: string
+      }
+      enqueue_backlinks_check: {
+        Args: { p_location_id: string }
         Returns: string
       }
       enqueue_geo_runs: { Args: { p_location_id: string }; Returns: number }

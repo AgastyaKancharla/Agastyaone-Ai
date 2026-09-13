@@ -58,6 +58,9 @@ $PSQL -f packages/db/tests/map_rank.sql || die "map rank failed"
 step "Geo visibility"
 $PSQL -f packages/db/tests/geo_visibility.sql || die "geo visibility failed"
 
+step "Backlinks"
+$PSQL -f packages/db/tests/backlinks.sql || die "backlinks failed"
+
 # ---------------------------------------------------------------------------
 # A guard that has never failed is not known to work. Each case below breaks
 # exactly one invariant and asserts the guards catch THAT one, then repairs it
