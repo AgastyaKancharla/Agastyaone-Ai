@@ -15,7 +15,9 @@
     "playwright-core": "^1.48.0",
     "@agastyaone/db": "*",
     "@agastyaone/dataforseo-client": "*",
-    "@agastyaone/map-rank-engine": "*"
+    "@agastyaone/map-rank-engine": "*",
+    "@agastyaone/ai-visibility-engine": "*",
+    "@agastyaone/llm-answer-client": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

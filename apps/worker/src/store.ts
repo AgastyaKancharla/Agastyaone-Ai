@@ -3,6 +3,7 @@ import type { Database } from '@agastyaone/db/types';
 import type { AuditSummary, DirectoryResult, NmcComplianceResult, SourceOfTruth } from '@agastyaone/nap-engine';
 import type { VisibilityRun } from './visibility.ts';
 import { rollupCompetitors, type PointResult, type ScanRun, type ScanTarget } from './mapRank.ts';
+import type { GeoRunOutcome, GeoRunTarget } from './geoVisibility.ts';
 import { CONFIG } from './config.ts';
 
 /**
@@ -232,6 +233,134 @@ export async function finaliseMapScan(run: ScanRun, target: ScanTarget): Promise
     .eq('id', target.scanId);
 
   if (error) throw new Error(`Could not finalise scan: ${error.message}`);
+}
+
+export async function loadGeoRunTarget(runId: string): Promise<GeoRunTarget> {
+  const { data, error } = await db
+    .from('geo_runs')
+    .select('id, tenant_id, location_id, engine, geo_prompts ( prompt ), tenant_locations ( name )')
+    .eq('id', runId)
+    .single();
+
+  if (error || !data) throw new Error(`Geo run ${runId} not found: ${error?.message}`);
+
+  const prompt = (data.geo_prompts as { prompt: string } | null)?.prompt;
+  const location = data.tenant_locations as { name: string | null } | null;
+  if (!prompt) throw new Error(`Geo run ${runId} has no prompt (the prompt may have been deleted)`);
+
+  return {
+    runId: data.id,
+    tenantId: data.tenant_id,
+    locationId: data.location_id ?? '',
+    prompt,
+    engine: data.engine as GeoRunTarget['engine'],
+    businessName: location?.name ?? '',
+  };
+}
+
+export async function markGeoRunFailed(runId: string, message: string): Promise<void> {
+  await db.from('geo_runs').update({ status: 'failed', error: message.slice(0, 2000) }).eq('id', runId);
+}
+
+/**
+ * Mentions are written before the run itself flips to 'completed', for the
+ * same reason children precede the header everywhere else in this codebase:
+ * nothing should be able to observe a completed run with no evidence behind it.
+ */
+export async function saveGeoRunResult(
+  target: GeoRunTarget,
+  outcome: GeoRunOutcome,
+): Promise<void> {
+  if (outcome.status !== 'completed' || !outcome.analysis) {
+    await db
+      .from('geo_runs')
+      .update({ status: 'failed', error: outcome.errorMessage ?? outcome.status })
+      .eq('id', target.runId);
+    return;
+  }
+
+  const { analysis } = outcome;
+
+  if (analysis.mentions.length > 0) {
+    const { error: mentionsError } = await db.from('geo_mentions').insert(
+      analysis.mentions.map((m) => ({
+        tenant_id: target.tenantId,
+        run_id: target.runId,
+        entity_name: m.entityName,
+        is_client: m.isClient,
+        position: m.position,
+        cited_url: m.citedUrl,
+        sentiment: m.sentiment,
+      })),
+    );
+    if (mentionsError) throw new Error(`Could not store mentions: ${mentionsError.message}`);
+  }
+
+  const { error } = await db
+    .from('geo_runs')
+    .update({
+      status: 'completed',
+      response_text: outcome.responseText,
+      was_mentioned: analysis.wasMentioned,
+      position: analysis.position,
+      share_of_voice: analysis.shareOfVoice,
+    })
+    .eq('id', target.runId);
+
+  if (error) throw new Error(`Could not finalise geo run: ${error.message}`);
+}
+
+/**
+ * The most recent COMPLETED run per (prompt, engine) pair for this location,
+ * fed into the pure scorer. Same "latest, not all-history" rule the citations
+ * pillar already uses for nap_audits: a prompt re-checked five times should
+ * count once, at its current answer, not five times at whatever it used to say.
+ */
+export async function loadLatestGeoRuns(
+  locationId: string,
+): Promise<{ engine: string; wasMentioned: boolean; position: number | null }[]> {
+  const { data, error } = await db
+    .from('geo_runs')
+    .select('prompt_id, engine, was_mentioned, position, run_at')
+    .eq('location_id', locationId)
+    .eq('status', 'completed')
+    .order('run_at', { ascending: false });
+
+  if (error) throw new Error(`Could not load geo runs: ${error.message}`);
+
+  const latest = new Map<string, { engine: string; wasMentioned: boolean; position: number | null }>();
+  for (const row of data ?? []) {
+    const key = `${row.prompt_id}|${row.engine}`;
+    if (latest.has(key)) continue; // already sorted newest-first
+    latest.set(key, { engine: row.engine, wasMentioned: row.was_mentioned, position: row.position });
+  }
+  return [...latest.values()];
+}
+
+/**
+ * The latest completed-or-partial scan's score per distinct tracked keyword
+ * at this location. A clinic can rank very differently for "dental clinic"
+ * versus "root canal treatment", so the map_rank pillar averages across
+ * keywords rather than reporting whichever one happened to be scanned last —
+ * the same reasoning aiVisibilityPillar averages across (prompt, engine) pairs.
+ */
+export async function loadLatestMapScanScores(locationId: string): Promise<number[]> {
+  const { data, error } = await db
+    .from('map_scans')
+    .select('keyword, score, created_at')
+    .eq('location_id', locationId)
+    .in('status', ['completed', 'partial'])
+    .not('score', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(`Could not load map scans: ${error.message}`);
+
+  const latestByKeyword = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (latestByKeyword.has(row.keyword) || row.score === null) continue; // already newest-first
+    latestByKeyword.set(row.keyword, Number(row.score));
+  }
+  return [...latestByKeyword.values()];
 }
 
 export async function markVisibilityRunning(auditId: string): Promise<void> {

@@ -6464,6 +6464,7 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_geo_runs: { Args: { p_location_id: string }; Returns: number }
       enqueue_map_scans: {
         Args: {
           p_grid_size?: number
@@ -6476,6 +6477,17 @@ export type Database = {
       enqueue_visibility_audit: {
         Args: { p_location_id: string }
         Returns: string
+      }
+      geo_queue_archive: { Args: { p_msg_id: number }; Returns: boolean }
+      geo_queue_delete: { Args: { p_msg_id: number }; Returns: boolean }
+      geo_queue_read: {
+        Args: { p_qty?: number; p_vt?: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
       }
       import_contacts: {
         Args: {

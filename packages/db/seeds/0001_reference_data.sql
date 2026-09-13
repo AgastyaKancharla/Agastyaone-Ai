@@ -180,6 +180,10 @@ insert into metric_definitions (code, name, service_code, unit, description, ver
   -- charting what a rate limit happened to let through.
   ('map_rank_score',          'Map Rank Score',             'visibility', 'score',   'Weighted visibility across the scan grid, weighted top-heavily because local-pack click-through collapses after third place.', 1, true),
   ('map_rank_solv',           'Share of Local Voice',       'visibility', 'percent', 'Share of grid points where the clinic ranks in the top 3 on Google Maps. The metric that tracks actual calls.', 1, true),
-  ('map_rank_arp',            'Average Rank Position',      'visibility', 'score',   'Mean position across only the grid points where the clinic appears at all. Absent — not zero — when it appears nowhere.', 1, true)
+  ('map_rank_arp',            'Average Rank Position',      'visibility', 'score',   'Mean position across only the grid points where the clinic appears at all. Absent — not zero — when it appears nowhere.', 1, true),
+  -- AI answer engines. Trended only at visibility-audit time, same discipline
+  -- as the website pillar — geo_runs itself is too granular an event to chart
+  -- point-by-point (see migration 0029).
+  ('visibility_ai_score',     'AI Answer Engine Score',     'visibility', 'score',   'Weighted visibility across ChatGPT, Perplexity, Gemini and Claude, weighted top-heavily because most patients act on the first name an assistant gives them.', 1, true)
 on conflict (code, version) do update
   set name = excluded.name, description = excluded.description, is_client_visible = excluded.is_client_visible;
