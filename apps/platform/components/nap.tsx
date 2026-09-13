@@ -2,7 +2,7 @@
 
 import { StatusPill } from './shell';
 
-/** Score plus verdict, identical in the Console and the Portal — only the findings list below it differs in tone. */
+/** Score plus verdict. */
 export function ComplianceScorePill({
   score,
   isCompliant,

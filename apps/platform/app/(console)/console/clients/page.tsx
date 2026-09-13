@@ -21,7 +21,7 @@ export default async function ClientsPage() {
         {tenants.length === 0 ? (
           <EmptyState
             title="No accounts yet"
-            description="Add your first client to create their account, their first location and the portal they sign into."
+            description="Add your first client to create their account and their first location."
             action={
               <Link href="/console/clients/new" className="btn-primary">
                 Add client

@@ -3,7 +3,7 @@
 A small, typed wrapper over Google **Places API (New)** — Place Details.
 
 It exists so a clinic's Google rating and recent reviews can be shown in the
-Console and Portal **today**, without waiting on Business Profile API access
+Console **today**, without waiting on Business Profile API access
 (which needs a verified profile 60+ days old, owned by us, and an approved
 application).
 

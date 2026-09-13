@@ -2,11 +2,11 @@
 
 Multi-tenant service delivery platform for AgastyaOne — accounts into contracts,
 contracts into engagements, engagements into delivery, delivery into billing and
-reporting, all of it visible to the client through a portal.
+reporting.
 
-One product, one design system, **two workspaces**: a dense internal Console for
-AgastyaOne staff and a simpler Portal for clients. Your login decides which
-organisation's data you see, which modules are switched on, and what you may do.
+One product, one design system: a dense internal Console for AgastyaOne staff.
+Your login decides which organisation's data you see, which modules are switched
+on, and what you may do.
 
 ## Service lines
 
@@ -31,7 +31,7 @@ line of code. Adding an eleventh service is an INSERT.
 
 ```
 apps/
-  platform/     Next.js 15 — Console + Portal   (not yet built)
+  platform/     Next.js 15 — Console            ✅
   worker/       Playwright + queue consumer     (not yet built)
 packages/
   db/           schema, RLS, seeds, tests       ✅

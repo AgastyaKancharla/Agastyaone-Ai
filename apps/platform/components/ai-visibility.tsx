@@ -1,4 +1,4 @@
-/** Shared presentation for AI answer-engine visibility, used by the Console and the Portal. */
+/** Presentation for AI answer-engine visibility. */
 
 export const ENGINE_LABEL: Record<string, string> = {
   chatgpt: 'ChatGPT',

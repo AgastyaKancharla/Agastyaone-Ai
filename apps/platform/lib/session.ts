@@ -1,7 +1,7 @@
 import { cache } from 'react';
 import { createClient } from './supabase/server';
 
-export type Workspace = 'console' | 'portal';
+export type Workspace = 'console' | 'client';
 
 export type TenantSummary = {
   id: string;
@@ -61,7 +61,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
     userId: user.id,
     email: profile?.email ?? user.email ?? '',
     fullName: profile?.full_name || (profile?.email ?? user.email ?? '').split('@')[0] || 'User',
-    workspace: isStaff ? 'console' : 'portal',
+    workspace: isStaff ? 'console' : 'client',
     tenantScope: staff?.tenant_scope ?? null,
     tenants: (tenants ?? []) as TenantSummary[],
   };

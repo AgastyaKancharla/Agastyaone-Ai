@@ -3,11 +3,7 @@ import { signOut } from '@/app/(auth)/sign-in/actions';
 
 export type NavItem = { href: string; label: string; icon: string; disabled?: boolean };
 
-/**
- * One shell for both workspaces. The Console and the Portal are the same
- * product with different navigation and different data — not two apps — so
- * they share this chrome rather than drifting apart visually.
- */
+/** The Console's chrome — sidebar nav, account menu, and the content area. */
 export function Shell({
   workspace,
   nav,
@@ -15,7 +11,7 @@ export function Shell({
   context,
   children,
 }: {
-  workspace: 'Console' | 'Portal';
+  workspace: 'Console';
   nav: NavItem[];
   user: { name: string; email: string };
   context?: React.ReactNode | undefined;

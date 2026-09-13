@@ -23,6 +23,3 @@ export const getEntitlements = cache(async (tenantId: string): Promise<Entitleme
     .eq('tenant_id', tenantId);
   return (data ?? []) as Entitlement[];
 });
-
-export const isEntitled = (entitlements: Entitlement[], code: string) =>
-  entitlements.some((e) => e.service_code === code && (e.state === 'active' || e.state === 'trial'));

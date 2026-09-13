@@ -175,8 +175,8 @@ export default async function ClientDetail({
               <div className="px-6 py-4 border-b border-hairline">
                 <h2 className="font-medium">Waiting on the client</h2>
                 <p className="hint">
-                  Appears in their portal immediately. Recording it here is what turns
-                  &ldquo;we were blocked on you&rdquo; from a memory into a number at renewal.
+                  Recording it here is what turns &ldquo;we were blocked on you&rdquo; from a memory
+                  into a number at renewal.
                 </p>
               </div>
 

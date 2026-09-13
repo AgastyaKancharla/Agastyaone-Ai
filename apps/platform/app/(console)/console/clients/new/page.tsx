@@ -7,7 +7,7 @@ export default function NewClientPage() {
     <>
       <PageHeader
         title="Add a client"
-        description="Creates the account, its first location, and the portal they will sign into."
+        description="Creates the account and its first location."
         action={<Link href="/console/clients" className="btn-secondary">Cancel</Link>}
       />
       <div className="p-8 max-w-3xl">

@@ -1,4 +1,4 @@
-/** Shared presentation for the Digital Visibility score, used by the Console and the Portal. */
+/** Presentation for the Digital Visibility score. */
 
 export const PILLAR_LABEL: Record<string, string> = {
   map_rank: 'Map rank',

@@ -19,8 +19,8 @@ export default async function SignInPage() {
             One platform for every client and every service.
           </h1>
           <p className="mt-4 text-white/70 leading-relaxed">
-            Websites, local presence, front desk, bookings and reporting — run from a
-            single console, and visible to each client in their own portal.
+            Websites, local presence, front desk, bookings and reporting — every
+            client and every service line, run from a single console.
           </p>
         </div>
         <p className="text-xs text-white/40">

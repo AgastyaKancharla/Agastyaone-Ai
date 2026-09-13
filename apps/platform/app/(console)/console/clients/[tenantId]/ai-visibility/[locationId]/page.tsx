@@ -150,10 +150,7 @@ export default async function LocationAiVisibilityPage({
 
               {uniqueRivals.length > 0 && (
                 <div className="px-6 py-4 border-t border-hairline bg-brand-wash/20">
-                  <p className="text-xs text-muted mb-1">
-                    Other businesses named for this prompt — staff only, never shown on the client&rsquo;s
-                    Portal.
-                  </p>
+                  <p className="text-xs text-muted mb-1">Other businesses named for this prompt.</p>
                   <p className="text-sm">{uniqueRivals.join(', ')}</p>
                 </div>
               )}
