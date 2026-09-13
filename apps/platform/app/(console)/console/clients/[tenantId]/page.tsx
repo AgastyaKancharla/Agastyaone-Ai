@@ -63,6 +63,9 @@ export default async function ClientDetail({
             <Link href={`/console/clients/${tenantId}/contracts`} className="btn-secondary">
               Contracts
             </Link>
+            <Link href={`/console/clients/${tenantId}/invoices`} className="btn-secondary">
+              Invoices
+            </Link>
             <Link href={`/console/clients/${tenantId}/contacts`} className="btn-secondary">
               Patients
             </Link>
