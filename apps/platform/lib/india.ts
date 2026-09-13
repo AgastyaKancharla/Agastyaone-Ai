@@ -31,3 +31,15 @@ export const stateName = (code?: string | null) =>
 
 export const slugify = (input: string) =>
   input.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
+
+const INR_FORMATTER = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 2,
+});
+
+/** Lakh/crore grouping, not thousands — `Intl`'s `en-IN` locale does this correctly where a manual formatter would not. */
+export const formatINR = (amount: number | string | null | undefined) => {
+  const n = typeof amount === 'string' ? Number(amount) : amount;
+  return n === null || n === undefined || Number.isNaN(n) ? '—' : INR_FORMATTER.format(n);
+};

@@ -60,6 +60,9 @@ export default async function ClientDetail({
         description={`/${tenant.slug} · ${tenant.vertical}`}
         action={
           <div className="flex items-center gap-2">
+            <Link href={`/console/clients/${tenantId}/contracts`} className="btn-secondary">
+              Contracts
+            </Link>
             <Link href={`/console/clients/${tenantId}/contacts`} className="btn-secondary">
               Patients
             </Link>
