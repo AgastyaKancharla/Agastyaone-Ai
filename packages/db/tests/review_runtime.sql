@@ -92,6 +92,14 @@ select pg_temp.eq(
                               'ChIJ_test_place_id_A') is not null,
   true, 'source: staff can connect a Google listing');
 
+-- 0037: connecting a Google place also sets tenant_locations.gbp_place_id --
+-- the map-rank page's coordinate sync reads that column, and nothing wrote
+-- it before this migration.
+select pg_temp.eq((select gbp_place_id from tenant_locations
+                    where id = 'cccccccc-0000-4000-8000-000000000001'),
+                  'ChIJ_test_place_id_A',
+                  'source: connecting a Google place sets tenant_locations.gbp_place_id too');
+
 -- Upsert, not duplicate: the unique key is (location_id, platform).
 select public.create_review_source('cccccccc-0000-4000-8000-000000000001', 'google',
                                    'https://maps.google.com/?cid=clinic-a-corrected', null);
@@ -107,6 +115,10 @@ select pg_temp.eq((select external_id from review_sources
                     where location_id = 'cccccccc-0000-4000-8000-000000000001'),
                   'ChIJ_test_place_id_A',
                   'source: an omitted place id does not erase the stored one');
+select pg_temp.eq((select gbp_place_id from tenant_locations
+                    where id = 'cccccccc-0000-4000-8000-000000000001'),
+                  'ChIJ_test_place_id_A',
+                  'source: gbp_place_id likewise survives a later call that omits it');
 
 select pg_temp.denied(
   $q$select public.create_review_source('cccccccc-0000-4000-8000-000000000001'::uuid, 'yelp', 'https://x')$q$,

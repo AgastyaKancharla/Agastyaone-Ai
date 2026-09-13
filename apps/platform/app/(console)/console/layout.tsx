@@ -4,6 +4,7 @@ import { Shell, type NavItem } from '@/components/shell';
 
 const nav: NavItem[] = [
   { href: '/console', label: 'Overview', icon: '◫' },
+  { href: '/console/prospects', label: 'Prospects', icon: '◎' },
   { href: '/console/clients', label: 'Clients', icon: '◈' },
   { href: '/console/delivery', label: 'Delivery', icon: '◷', disabled: true },
   { href: '/console/services', label: 'Services', icon: '⚙' },
