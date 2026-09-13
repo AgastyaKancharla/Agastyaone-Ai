@@ -6,8 +6,7 @@ const nav: NavItem[] = [
   { href: '/console', label: 'Overview', icon: '◫' },
   { href: '/console/clients', label: 'Clients', icon: '◈' },
   { href: '/console/delivery', label: 'Delivery', icon: '◷', disabled: true },
-  { href: '/console/commercial', label: 'Commercial', icon: '₹', disabled: true },
-  { href: '/console/services', label: 'Services', icon: '⚙', disabled: true },
+  { href: '/console/services', label: 'Services', icon: '⚙' },
 ];
 
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
