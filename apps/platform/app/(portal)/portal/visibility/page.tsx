@@ -11,6 +11,7 @@ import {
   VisibilityScoreHero,
 } from '@/components/visibility';
 import { HeatmapTable, RankHeatmap, ScanMetrics } from '@/components/map-rank';
+import { BacklinksSummaryTiles } from '@/components/backlinks';
 
 /**
  * What a finding means to the CLIENT — what it costs them, not what the rule
@@ -76,7 +77,7 @@ export default async function PortalVisibility() {
         .eq('scan_id', mapScan.id)
     : { data: null };
 
-  const [{ data: pillars }, { data: findings }, { data: snapshots }] = await Promise.all([
+  const [{ data: pillars }, { data: findings }, { data: snapshots }, { data: backlinks }] = await Promise.all([
     supabase
       .from('visibility_pillar_scores')
       .select('pillar, score, weight, measured')
@@ -92,6 +93,13 @@ export default async function PortalVisibility() {
       .eq('metric_code', 'visibility_score')
       .order('period_start', { ascending: true })
       .limit(24),
+    supabase
+      .from('backlinks_checks')
+      .select('domain, score, referring_domains, total_backlinks, broken_backlinks, spam_score, completed_at')
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const ORDER = ['map_rank', 'website', 'citations', 'reviews', 'ai_visibility', 'backlinks'];
@@ -156,6 +164,31 @@ export default async function PortalVisibility() {
                 keyword={mapScan.keyword}
               />
               <HeatmapTable points={mapPoints ?? []} size={mapScan.grid_size} />
+            </div>
+          </section>
+        )}
+
+        {backlinks && (
+          <section className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-hairline">
+              <h2 className="font-medium">Who is linking to you</h2>
+              <p className="hint">
+                &ldquo;{backlinks.domain}&rdquo;, last checked{' '}
+                {backlinks.completed_at &&
+                  new Date(backlinks.completed_at).toLocaleDateString('en-IN', {
+                    day: 'numeric', month: 'long',
+                  })}
+                .
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <BacklinksSummaryTiles
+                score={backlinks.score}
+                referringDomains={backlinks.referring_domains}
+                totalBacklinks={backlinks.total_backlinks}
+                brokenBacklinks={backlinks.broken_backlinks}
+                spamScore={backlinks.spam_score}
+              />
             </div>
           </section>
         )}

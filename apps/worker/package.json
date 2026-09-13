@@ -17,7 +17,8 @@
     "@agastyaone/dataforseo-client": "*",
     "@agastyaone/map-rank-engine": "*",
     "@agastyaone/ai-visibility-engine": "*",
-    "@agastyaone/llm-answer-client": "*"
+    "@agastyaone/llm-answer-client": "*",
+    "@agastyaone/backlinks-engine": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
