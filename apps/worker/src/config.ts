@@ -32,6 +32,21 @@ export const CONFIG = {
   pageSpeedApiKey: process.env.PAGESPEED_API_KEY ?? '',
   /** Lighthouse runs a real browser server-side, so this is generous. */
   pageSpeedTimeoutMs: Number(process.env.WORKER_PAGESPEED_TIMEOUT_MS ?? 60000),
+
+  /**
+   * Pause between grid points. Paces a scan so one long job cannot starve the
+   * other two queues, and keeps a paid provider from being hit 81 times in
+   * three seconds.
+   */
+  mapPointDelayMs: Number(process.env.WORKER_MAP_POINT_DELAY_MS ?? 250),
+  /**
+   * Visibility timeout for a grid scan, far longer than the other queues: 81
+   * paced lookups take minutes, and the default 300s would have pgmq redeliver
+   * the job mid-run and bill the scan twice. The worker also heartbeats to
+   * extend it further as it goes.
+   */
+  mapVisibilityTimeoutSec: Number(process.env.WORKER_MAP_VISIBILITY_TIMEOUT ?? 1800),
+
   /** Attempts before a job is archived to the dead letter. */
   maxAttempts: Number(process.env.WORKER_MAX_ATTEMPTS ?? 3),
 } as const;

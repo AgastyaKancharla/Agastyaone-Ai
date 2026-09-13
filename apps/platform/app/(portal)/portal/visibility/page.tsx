@@ -10,6 +10,7 @@ import {
   SIGNAL_GROUP_LABEL,
   VisibilityScoreHero,
 } from '@/components/visibility';
+import { HeatmapTable, RankHeatmap, ScanMetrics } from '@/components/map-rank';
 
 /**
  * What a finding means to the CLIENT — what it costs them, not what the rule
@@ -59,6 +60,21 @@ export default async function PortalVisibility() {
       </>
     );
   }
+
+  const { data: mapScan } = await supabase
+    .from('map_scans')
+    .select('id, keyword, grid_size, spacing_m, score, solv, arp, coverage_pct, completed_at')
+    .in('status', ['completed', 'partial'])
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: mapPoints } = mapScan
+    ? await supabase
+        .from('map_scan_points')
+        .select('idx, row_n, col_n, status, rank')
+        .eq('scan_id', mapScan.id)
+    : { data: null };
 
   const [{ data: pillars }, { data: findings }, { data: snapshots }] = await Promise.all([
     supabase
@@ -116,6 +132,33 @@ export default async function PortalVisibility() {
           </div>
           <PillarBars pillars={orderedPillars} />
         </section>
+
+        {mapScan && (
+          <section className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-hairline">
+              <h2 className="font-medium">Where you show up on the map</h2>
+              <p className="hint">
+                We searched &ldquo;{mapScan.keyword}&rdquo; from {mapScan.grid_size * mapScan.grid_size}{' '}
+                points across your area and recorded your position at each one.
+              </p>
+            </div>
+            <div className="px-6 py-5 space-y-6">
+              <ScanMetrics
+                score={mapScan.score}
+                solv={mapScan.solv}
+                arp={mapScan.arp}
+                coverage={mapScan.coverage_pct}
+              />
+              <RankHeatmap
+                points={mapPoints ?? []}
+                size={mapScan.grid_size}
+                spacingM={mapScan.spacing_m}
+                keyword={mapScan.keyword}
+              />
+              <HeatmapTable points={mapPoints ?? []} size={mapScan.grid_size} />
+            </div>
+          </section>
+        )}
 
         {(issues.length > 0 || opportunities.length > 0) && (
           <section className="card overflow-hidden">

@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@agastyaone/db/types';
 import type { AuditSummary, DirectoryResult, NmcComplianceResult, SourceOfTruth } from '@agastyaone/nap-engine';
 import type { VisibilityRun } from './visibility.ts';
+import { rollupCompetitors, type PointResult, type ScanRun, type ScanTarget } from './mapRank.ts';
 import { CONFIG } from './config.ts';
 
 /**
@@ -57,6 +58,180 @@ export async function markFailed(auditId: string, message: string): Promise<void
     .from('nap_audits')
     .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
     .eq('id', auditId);
+}
+
+/** Everything the worker needs to scan one keyword, in one round trip. */
+export async function loadScanTarget(scanId: string): Promise<ScanTarget> {
+  const { data, error } = await db
+    .from('map_scans')
+    .select('id, tenant_id, location_id, keyword, grid_size, spacing_m, center_lat, center_lng, tenant_locations ( name, gbp_place_id )')
+    .eq('id', scanId)
+    .single();
+
+  if (error || !data) throw new Error(`Scan ${scanId} not found: ${error?.message}`);
+
+  const location = data.tenant_locations as { name: string | null; gbp_place_id: string | null } | null;
+
+  return {
+    scanId: data.id,
+    tenantId: data.tenant_id,
+    locationId: data.location_id,
+    keyword: data.keyword,
+    businessName: location?.name ?? '',
+    placeId: location?.gbp_place_id ?? null,
+    centreLat: Number(data.center_lat),
+    centreLng: Number(data.center_lng),
+    gridSize: data.grid_size,
+    spacingM: data.spacing_m,
+  };
+}
+
+/**
+ * Points a previous attempt already completed.
+ *
+ * This is what makes a pgmq redelivery free rather than a second full bill.
+ * Only settled outcomes count: a point that was blocked or errored last time is
+ * worth retrying, so it is deliberately not loaded here.
+ */
+export async function loadCompletedPoints(scanId: string): Promise<Map<number, PointResult>> {
+  const { data } = await db
+    .from('map_scan_points')
+    .select('idx, row_n, col_n, lat, lng, status, rank, matched_place_id, result_count')
+    .eq('scan_id', scanId)
+    .in('status', ['found', 'not_ranked', 'ambiguous']);
+
+  const done = new Map<number, PointResult>();
+  for (const row of data ?? []) {
+    done.set(row.idx, {
+      point: { idx: row.idx, row: row.row_n, col: row.col_n, lat: Number(row.lat), lng: Number(row.lng) },
+      status: row.status as PointResult['status'],
+      rank: row.rank,
+      matchedPlaceId: row.matched_place_id,
+      resultCount: row.result_count,
+      errorMessage: null,
+      // Competitors were already persisted on the first attempt; re-reading them
+      // only to re-write them would be work for nothing.
+      competitors: [],
+    });
+  }
+  return done;
+}
+
+export async function markMapScanRunning(
+  scanId: string,
+  providerCode: string,
+  zoom: number,
+  fingerprint: string,
+): Promise<void> {
+  await db
+    .from('map_scans')
+    .update({
+      status: 'running',
+      started_at: new Date().toISOString(),
+      provider_code: providerCode,
+      zoom,
+      grid_fingerprint: fingerprint,
+    })
+    .eq('id', scanId);
+}
+
+export async function markMapScanFailed(scanId: string, message: string): Promise<void> {
+  await db
+    .from('map_scans')
+    .update({ status: 'failed', error_message: message.slice(0, 2000), completed_at: new Date().toISOString() })
+    .eq('id', scanId);
+}
+
+/** Upsert on (scan_id, idx) so a resumed scan overwrites rather than duplicates. */
+export async function saveScanPoint(
+  scanId: string,
+  tenantId: string,
+  result: PointResult,
+): Promise<void> {
+  const { error } = await db.from('map_scan_points').upsert(
+    {
+      tenant_id: tenantId,
+      scan_id: scanId,
+      idx: result.point.idx,
+      row_n: result.point.row,
+      col_n: result.point.col,
+      lat: result.point.lat,
+      lng: result.point.lng,
+      status: result.status,
+      rank: result.rank,
+      matched_place_id: result.matchedPlaceId,
+      result_count: result.resultCount,
+      error_message: result.errorMessage,
+      checked_at: new Date().toISOString(),
+    },
+    { onConflict: 'scan_id,idx' },
+  );
+  if (error) throw new Error(`Could not store point ${result.point.idx}: ${error.message}`);
+
+  if (result.competitors.length > 0) {
+    await db.from('map_scan_competitors').insert(
+      result.competitors.map((c) => ({
+        tenant_id: tenantId,
+        scan_id: scanId,
+        point_idx: result.point.idx,
+        rank: c.rank,
+        place_id: c.placeId,
+        name: c.name,
+        rating: c.rating,
+        review_count: c.reviewCount,
+      })),
+    );
+  }
+}
+
+/**
+ * Finalise the scan. Points are already stored; this writes the rollup and the
+ * header, in that order, because the metrics trigger fires on the header's
+ * status change and a snapshot should never precede the data it summarises.
+ */
+export async function finaliseMapScan(run: ScanRun, target: ScanTarget): Promise<void> {
+  const rollup = rollupCompetitors(run.points);
+  if (rollup.length > 0) {
+    await db.from('map_scan_competitor_rollup').upsert(
+      rollup.map((c) => ({
+        tenant_id: target.tenantId,
+        scan_id: target.scanId,
+        place_id: c.placeId,
+        name: c.name,
+        points_seen: c.pointsSeen,
+        avg_rank: c.avgRank,
+        solv: c.solv,
+      })),
+      { onConflict: 'scan_id,name' },
+    );
+  }
+
+  const m = run.metrics;
+  const blocked = run.points.filter((p) => p.status === 'blocked').length;
+  const errored = run.points.filter((p) => p.status === 'error').length;
+
+  const { error } = await db
+    .from('map_scans')
+    .update({
+      // 'partial' is not a failure: it is a scan that lost points but still has
+      // something to say. The coverage gate in the trigger decides separately
+      // whether it earned a place on the trend line.
+      status: m.pointsScanned === m.pointsRequested ? 'completed' : 'partial',
+      points_scanned: m.pointsScanned,
+      points_found: m.pointsFound,
+      points_blocked: blocked,
+      points_errored: errored,
+      arp: m.arp,
+      atrp: m.atrp,
+      solv: m.solv,
+      score: m.score,
+      coverage_pct: m.coveragePct,
+      cost_micros: run.costMicros,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', target.scanId);
+
+  if (error) throw new Error(`Could not finalise scan: ${error.message}`);
 }
 
 export async function markVisibilityRunning(auditId: string): Promise<void> {

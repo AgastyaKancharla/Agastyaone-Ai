@@ -33,6 +33,11 @@ const FIELD_MASK = [
   'userRatingCount',
   'googleMapsUri',
   'reviews',
+  // Google's own coordinate for the clinic. Free to add here (billed at the
+  // same Enterprise tier `reviews` already forces) and it is what gives the
+  // geo-grid a centre: tenant_locations.latitude/longitude had no writer at
+  // all before this.
+  'location',
 ].join(',');
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
@@ -53,6 +58,7 @@ type RawReview = {
 
 type RawPlace = {
   id?: string;
+  location?: { latitude?: number; longitude?: number };
   displayName?: { text?: string };
   rating?: number;
   userRatingCount?: number;
@@ -177,6 +183,8 @@ export class PlacesClient {
       rating: num(raw.rating),
       userRatingCount: num(raw.userRatingCount),
       googleMapsUri: str(raw.googleMapsUri),
+      latitude: num(raw.location?.latitude),
+      longitude: num(raw.location?.longitude),
       reviews: Array.isArray(raw.reviews) ? raw.reviews.map(toReview) : [],
       fetchedAt: new Date(this.#now()).toISOString(),
     };

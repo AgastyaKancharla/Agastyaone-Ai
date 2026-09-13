@@ -2891,6 +2891,343 @@ export type Database = {
           },
         ]
       }
+      map_keywords: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          location_id: string
+          phrase: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_id: string
+          phrase: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_id?: string
+          phrase?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_keywords_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_keywords_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_scan_competitor_rollup: {
+        Row: {
+          avg_rank: number | null
+          id: string
+          name: string
+          place_id: string | null
+          points_seen: number
+          scan_id: string
+          solv: number | null
+          tenant_id: string
+        }
+        Insert: {
+          avg_rank?: number | null
+          id?: string
+          name: string
+          place_id?: string | null
+          points_seen: number
+          scan_id: string
+          solv?: number | null
+          tenant_id: string
+        }
+        Update: {
+          avg_rank?: number | null
+          id?: string
+          name?: string
+          place_id?: string | null
+          points_seen?: number
+          scan_id?: string
+          solv?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_scan_competitor_rollup_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "map_scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_scan_competitor_rollup_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_scan_competitors: {
+        Row: {
+          id: string
+          name: string
+          place_id: string | null
+          point_idx: number
+          rank: number
+          rating: number | null
+          review_count: number | null
+          scan_id: string
+          tenant_id: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          place_id?: string | null
+          point_idx: number
+          rank: number
+          rating?: number | null
+          review_count?: number | null
+          scan_id: string
+          tenant_id: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          place_id?: string | null
+          point_idx?: number
+          rank?: number
+          rating?: number | null
+          review_count?: number | null
+          scan_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_scan_competitors_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "map_scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_scan_competitors_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_scan_points: {
+        Row: {
+          checked_at: string
+          col_n: number
+          error_message: string | null
+          id: string
+          idx: number
+          lat: number
+          lng: number
+          matched_place_id: string | null
+          rank: number | null
+          result_count: number | null
+          row_n: number
+          scan_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          checked_at?: string
+          col_n: number
+          error_message?: string | null
+          id?: string
+          idx: number
+          lat: number
+          lng: number
+          matched_place_id?: string | null
+          rank?: number | null
+          result_count?: number | null
+          row_n: number
+          scan_id: string
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          checked_at?: string
+          col_n?: number
+          error_message?: string | null
+          id?: string
+          idx?: number
+          lat?: number
+          lng?: number
+          matched_place_id?: string | null
+          rank?: number | null
+          result_count?: number | null
+          row_n?: number
+          scan_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_scan_points_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "map_scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_scan_points_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_scans: {
+        Row: {
+          arp: number | null
+          atrp: number | null
+          center_lat: number
+          center_lng: number
+          completed_at: string | null
+          cost_micros: number
+          coverage_pct: number | null
+          created_at: string
+          depth: number
+          error_message: string | null
+          grid_fingerprint: string | null
+          grid_size: number
+          id: string
+          keyword: string
+          location_id: string
+          points_blocked: number
+          points_errored: number
+          points_found: number
+          points_requested: number
+          points_scanned: number
+          provider_code: string | null
+          queued_at: string
+          requested_by: string | null
+          score: number | null
+          solv: number | null
+          spacing_m: number
+          started_at: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          zoom: number | null
+        }
+        Insert: {
+          arp?: number | null
+          atrp?: number | null
+          center_lat: number
+          center_lng: number
+          completed_at?: string | null
+          cost_micros?: number
+          coverage_pct?: number | null
+          created_at?: string
+          depth?: number
+          error_message?: string | null
+          grid_fingerprint?: string | null
+          grid_size: number
+          id?: string
+          keyword: string
+          location_id: string
+          points_blocked?: number
+          points_errored?: number
+          points_found?: number
+          points_requested?: number
+          points_scanned?: number
+          provider_code?: string | null
+          queued_at?: string
+          requested_by?: string | null
+          score?: number | null
+          solv?: number | null
+          spacing_m: number
+          started_at?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          zoom?: number | null
+        }
+        Update: {
+          arp?: number | null
+          atrp?: number | null
+          center_lat?: number
+          center_lng?: number
+          completed_at?: string | null
+          cost_micros?: number
+          coverage_pct?: number | null
+          created_at?: string
+          depth?: number
+          error_message?: string | null
+          grid_fingerprint?: string | null
+          grid_size?: number
+          id?: string
+          keyword?: string
+          location_id?: string
+          points_blocked?: number
+          points_errored?: number
+          points_found?: number
+          points_requested?: number
+          points_scanned?: number
+          provider_code?: string | null
+          queued_at?: string
+          requested_by?: string | null
+          score?: number | null
+          solv?: number | null
+          spacing_m?: number
+          started_at?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          zoom?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_scans_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_scans_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_scans_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           created_at: string
@@ -5278,6 +5615,8 @@ export type Database = {
           country: string
           created_at: string
           gbp_place_id: string | null
+          geo_source: string | null
+          geo_updated_at: string | null
           id: string
           is_primary: boolean
           latitude: number | null
@@ -5300,6 +5639,8 @@ export type Database = {
           country?: string
           created_at?: string
           gbp_place_id?: string | null
+          geo_source?: string | null
+          geo_updated_at?: string | null
           id?: string
           is_primary?: boolean
           latitude?: number | null
@@ -5322,6 +5663,8 @@ export type Database = {
           country?: string
           created_at?: string
           gbp_place_id?: string | null
+          geo_source?: string | null
+          geo_updated_at?: string | null
           id?: string
           is_primary?: boolean
           latitude?: number | null
@@ -6121,6 +6464,14 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_map_scans: {
+        Args: {
+          p_grid_size?: number
+          p_location_id: string
+          p_spacing_m?: number
+        }
+        Returns: number
+      }
       enqueue_nap_audit: { Args: { p_location_id: string }; Returns: string }
       enqueue_visibility_audit: {
         Args: { p_location_id: string }
@@ -6142,6 +6493,21 @@ export type Database = {
       log_tenant_access: {
         Args: { p_reason?: string; p_tenant_id: string }
         Returns: boolean
+      }
+      map_queue_archive: { Args: { p_msg_id: number }; Returns: boolean }
+      map_queue_delete: { Args: { p_msg_id: number }; Returns: boolean }
+      map_queue_heartbeat: {
+        Args: { p_msg_id: number; p_vt?: number }
+        Returns: boolean
+      }
+      map_queue_read: {
+        Args: { p_qty?: number; p_vt?: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
       }
       nap_queue_archive: { Args: { p_msg_id: number }; Returns: boolean }
       nap_queue_delete: { Args: { p_msg_id: number }; Returns: boolean }

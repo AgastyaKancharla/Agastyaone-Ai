@@ -33,6 +33,9 @@ export type PlaceSummary = {
    * wherever this content is shown, so it is not optional in the UI.
    */
   googleMapsUri: string | null;
+  /** Google's coordinate for the listing — the grid centre for a map scan. */
+  latitude: number | null;
+  longitude: number | null;
   reviews: PlaceReview[];
   /** When this was fetched. Nothing here is stored, so the UI says how fresh it is. */
   fetchedAt: string;

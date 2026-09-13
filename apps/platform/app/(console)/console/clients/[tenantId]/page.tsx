@@ -110,6 +110,12 @@ export default async function ClientDetail({
                           >
                             Visibility →
                           </Link>
+                          <Link
+                            href={`/console/clients/${tenantId}/map-rank/${l.id}`}
+                            className="text-xs text-brand hover:underline"
+                          >
+                            Map rank →
+                          </Link>
                         </div>
                       </div>
                       <div className="text-sm text-muted mt-1">
