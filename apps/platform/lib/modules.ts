@@ -11,7 +11,7 @@ export const PORTAL_MODULES: { code: string; label: string; icon: string; href: 
   { code: 'gbp_management',       label: 'Google Profile', icon: '◉', href: '/portal/gbp' },
   { code: 'directory_nap',        label: 'Listings',       icon: '◈', href: '/portal/listings', ready: true },
   { code: 'visibility',           label: 'Visibility',     icon: '◎', href: '/portal/visibility', ready: true },
-  { code: 'geo',                  label: 'AI Visibility',  icon: '✦', href: '/portal/ai-visibility' },
+  { code: 'geo',                  label: 'AI Visibility',  icon: '✦', href: '/portal/ai-visibility', ready: true },
   { code: 'unified_inbox',        label: 'Inbox',          icon: '✉', href: '/portal/inbox' },
   { code: 'ai_receptionist',      label: 'Receptionist',   icon: '☏', href: '/portal/receptionist' },
   { code: 'call_tracking',        label: 'Calls',          icon: '☎', href: '/portal/calls' },

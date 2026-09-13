@@ -6,9 +6,11 @@ import {
   type PillarInput,
   type WebsiteAnalysis,
 } from '@agastyaone/visibility-engine';
+import { computeAiVisibilityScore, type EngineRun } from '@agastyaone/ai-visibility-engine';
+import type { JsonObject } from '@agastyaone/visibility-engine';
 import { browserPool } from './browser.ts';
 import { CONFIG } from './config.ts';
-import { db } from './store.ts';
+import { db, loadLatestGeoRuns, loadLatestMapScanScores } from './store.ts';
 
 export interface VisibilityRun {
   composite: CompositeResult;
@@ -139,6 +141,45 @@ async function citationsPillar(locationId: string): Promise<number | null> {
  * wearing a hat. Reputation scoring waits for Google Business Profile API
  * access, at which point this pillar gains a second input.
  */
+/**
+ * AI answer-engine pillar, from whatever geo_runs already exist.
+ *
+ * Reads, never triggers. Enqueuing fresh checks here would make a visibility
+ * audit block on four LLM calls per active prompt, when the whole point of a
+ * separate geo_runs queue (0028) is that those checks run on their own
+ * cadence. Same "read the latest, don't re-run" relationship citations
+ * already has with nap_audits.
+ */
+async function aiVisibilityPillar(
+  locationId: string,
+): Promise<{ score: number | null; detail: JsonObject }> {
+  const rows = await loadLatestGeoRuns(locationId);
+  const runs: EngineRun[] = rows.map((r) => ({
+    engine: r.engine as EngineRun['engine'],
+    wasMentioned: r.wasMentioned,
+    position: r.position,
+  }));
+
+  const result = computeAiVisibilityScore(runs);
+  return {
+    score: result.score,
+    detail: { mentionRate: result.mentionRate, runsConsidered: result.runsConsidered },
+  };
+}
+
+/**
+ * Map-rank pillar, from whatever scans already exist. Also a read, not a
+ * trigger, for the same reason: a keyword grid scan is a paced, multi-minute,
+ * cost-bearing job, and a visibility audit must stay a page fetch plus a few
+ * queries, not something that waits on it.
+ */
+async function mapRankPillar(locationId: string): Promise<{ score: number | null; detail: JsonObject }> {
+  const scores = await loadLatestMapScanScores(locationId);
+  if (scores.length === 0) return { score: null, detail: { reason: 'no completed scan yet' } };
+  const score = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  return { score, detail: { keywordsConsidered: scores.length } };
+}
+
 async function reviewsPillar(locationId: string): Promise<number | null> {
   const { data } = await db
     .from('metric_snapshots')
@@ -158,10 +199,12 @@ export async function runVisibilityAudit(
 ): Promise<VisibilityRun> {
   const url = websiteUrl ? toNavigableUrl(websiteUrl) : null;
 
-  const [website, citations, reviews] = await Promise.all([
+  const [website, citations, reviews, aiVisibility, mapRank] = await Promise.all([
     url ? analyseHomepage(url) : Promise.resolve(null),
     citationsPillar(locationId),
     reviewsPillar(locationId),
+    aiVisibilityPillar(locationId),
+    mapRankPillar(locationId),
   ]);
 
   const pillars: PillarInput[] = [
@@ -174,10 +217,10 @@ export async function runVisibilityAudit(
     },
     { pillar: 'citations', score: citations, detail: { basis: 'latest completed NAP audit' } },
     { pillar: 'reviews', score: reviews, detail: { basis: 'review request scan rate' } },
+    { pillar: 'ai_visibility', score: aiVisibility.score, detail: aiVisibility.detail },
+    { pillar: 'map_rank', score: mapRank.score, detail: mapRank.detail },
     // Not built yet. Recorded as unmeasured so the client can see what is
-    // still coming rather than wondering why a six-pillar score shows three.
-    { pillar: 'map_rank', score: null, detail: { reason: 'not measured yet' } },
-    { pillar: 'ai_visibility', score: null, detail: { reason: 'not measured yet' } },
+    // still coming rather than wondering why a six-pillar score shows five.
     { pillar: 'backlinks', score: null, detail: { reason: 'not measured yet' } },
   ];
 

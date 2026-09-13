@@ -3,18 +3,22 @@ import { browserPool } from './browser.ts';
 import { runAudit } from './audit.ts';
 import { runVisibilityAudit } from './visibility.ts';
 import { planScan, runMapScan, selectProvider } from './mapRank.ts';
+import { runGeoCheck } from './geoVisibility.ts';
 import {
   db,
   finaliseMapScan,
   loadCompletedPoints,
+  loadGeoRunTarget,
   loadScanTarget,
   loadSourceOfTruth,
   markFailed,
+  markGeoRunFailed,
   markMapScanFailed,
   markMapScanRunning,
   markRunning,
   markVisibilityFailed,
   markVisibilityRunning,
+  saveGeoRunResult,
   saveResults,
   saveScanPoint,
   saveVisibilityResults,
@@ -35,16 +39,23 @@ type MapMessage = {
   location_id: string;
   keyword: string;
 };
+type GeoMessage = {
+  run_id: string;
+  tenant_id: string;
+  location_id: string;
+  prompt: string;
+  engine: string;
+};
 
 /**
- * One worker process, three queues.
+ * One worker process, four queues.
  *
- * Separate queues rather than a job-type column on one, because the three have
- * genuinely different shapes: a NAP audit crawls five directories on a shared
- * browser, a visibility audit reads one page and waits on Lighthouse, and a map
- * scan makes 81 paced, cost-bearing lookups over several minutes. A slow one of
- * any kind must not sit in front of the others, and they need different
- * visibility timeouts.
+ * Separate queues rather than a job-type column on one, because each has a
+ * genuinely different shape: a NAP audit crawls five directories on a shared
+ * browser, a visibility audit reads one page and waits on Lighthouse, a map
+ * scan makes 81 paced, cost-bearing lookups over several minutes, and a geo
+ * check is a single, fast LLM call. A slow one of any kind must not sit in
+ * front of the others, and they need different visibility timeouts.
  */
 interface Pipeline<M> {
   label: string;
@@ -171,6 +182,42 @@ const mapPipeline: Pipeline<MapMessage> = {
   },
 };
 
+const geoPipeline: Pipeline<GeoMessage> = {
+  label: 'geo',
+  async claim() {
+    const { data, error } = await db.rpc('geo_queue_read', { p_vt: 120, p_qty: 1 });
+    if (error) throw new Error(`Queue read failed: ${error.message}`);
+    return (data as unknown as Job<GeoMessage>[] | null)?.[0] ?? null;
+  },
+  auditId: (job) => job.message.run_id,
+  async run(job) {
+    const target = await loadGeoRunTarget(job.message.run_id);
+    const outcome = await runGeoCheck(target);
+    await saveGeoRunResult(target, outcome);
+
+    if (outcome.status !== 'completed') {
+      // Not a throw: a rate limit or provider error is a real, recorded
+      // outcome (geo_runs.status = 'failed', with the reason), not a bug in
+      // this job worth pgmq's retry machinery. Retrying immediately against a
+      // rate-limited provider would make the block worse, not better.
+      return `${target.engine} did not complete: ${outcome.errorMessage}`;
+    }
+    const a = outcome.analysis!;
+    return (
+      `${target.engine}: ${a.wasMentioned ? `mentioned${a.position ? ` at #${a.position}` : ''}` : 'not mentioned'}` +
+      (a.shareOfVoice !== null ? `, share of voice ${a.shareOfVoice}%` : '') +
+      `, ${a.mentions.length} businesses named`
+    );
+  },
+  async complete(job) {
+    await db.rpc('geo_queue_delete', { p_msg_id: job.msg_id });
+  },
+  async giveUp(job, message) {
+    await markGeoRunFailed(job.message.run_id, message);
+    await db.rpc('geo_queue_archive', { p_msg_id: job.msg_id });
+  },
+};
+
 async function handle<M>(pipeline: Pipeline<M>, job: Job<M>): Promise<void> {
   const id = pipeline.auditId(job).slice(0, 8);
   const tag = `[${pipeline.label} ${id}]`;
@@ -218,12 +265,18 @@ async function claimAny(): Promise<boolean> {
     worked = true;
   }
 
+  const geoJob = await geoPipeline.claim();
+  if (geoJob) {
+    await handle(geoPipeline, geoJob);
+    worked = true;
+  }
+
   return worked;
 }
 
 async function main(): Promise<void> {
   console.log(
-    `AgastyaOne audit worker starting — queues: nap, visibility, map — ` +
+    `AgastyaOne audit worker starting — queues: nap, visibility, map, geo — ` +
       `concurrency ${CONFIG.concurrency}, visibility ${CONFIG.visibilityTimeoutSec}s, ` +
       (CONFIG.playwrightWsEndpoint ? 'remote browser' : 'local Chromium'),
   );
