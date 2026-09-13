@@ -175,6 +175,11 @@ insert into metric_definitions (code, name, service_code, unit, description, ver
   ('visibility_score',        'Digital Visibility Score',   'visibility', 'score',   'Weighted mean across the pillars that could be measured — map rank, website, citations, reviews, AI answer engines, backlinks. Unmeasured pillars are excluded and the remaining weights re-normalised, so an unreachable source never reads as a low score.', 1, true),
   ('visibility_coverage_pct', 'Visibility Coverage',        'visibility', 'percent', 'Share of the scoring model''s total weight that was actually measured on this run.', 1, true),
   ('visibility_website_score','Website Visibility Score',   'visibility', 'score',   'The website pillar on its own — search, AI-answer and answer-engine readiness of the clinic''s own site.', 1, true),
-  ('visibility_issues_open',  'Open Visibility Issues',     'visibility', 'count',   'Website findings currently classed as issues rather than opportunities.', 1, true)
+  ('visibility_issues_open',  'Open Visibility Issues',     'visibility', 'count',   'Website findings currently classed as issues rather than opportunities.', 1, true),
+  -- Map rank. A scan below 80% coverage writes none of these at all rather than
+  -- charting what a rate limit happened to let through.
+  ('map_rank_score',          'Map Rank Score',             'visibility', 'score',   'Weighted visibility across the scan grid, weighted top-heavily because local-pack click-through collapses after third place.', 1, true),
+  ('map_rank_solv',           'Share of Local Voice',       'visibility', 'percent', 'Share of grid points where the clinic ranks in the top 3 on Google Maps. The metric that tracks actual calls.', 1, true),
+  ('map_rank_arp',            'Average Rank Position',      'visibility', 'score',   'Mean position across only the grid points where the clinic appears at all. Absent — not zero — when it appears nowhere.', 1, true)
 on conflict (code, version) do update
   set name = excluded.name, description = excluded.description, is_client_visible = excluded.is_client_visible;

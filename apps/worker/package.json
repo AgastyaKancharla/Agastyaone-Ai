@@ -13,7 +13,9 @@
     "@agastyaone/visibility-engine": "*",
     "@supabase/supabase-js": "^2.45.4",
     "playwright-core": "^1.48.0",
-    "@agastyaone/db": "*"
+    "@agastyaone/db": "*",
+    "@agastyaone/dataforseo-client": "*",
+    "@agastyaone/map-rank-engine": "*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
