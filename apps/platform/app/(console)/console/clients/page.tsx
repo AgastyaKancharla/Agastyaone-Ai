@@ -4,7 +4,9 @@ import { PageHeader, StatusPill, EmptyState } from '@/components/shell';
 
 export default async function ClientsPage() {
   const session = await getSession();
-  const tenants = session?.tenants ?? [];
+  // Prospects live in their own section — they aren't clients yet, and
+  // mixing the two lists would make "who's actually paying us" ambiguous.
+  const tenants = (session?.tenants ?? []).filter((t) => t.status !== 'prospect');
 
   return (
     <>

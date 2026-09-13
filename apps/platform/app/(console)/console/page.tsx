@@ -7,7 +7,9 @@ export default async function ConsoleOverview() {
   const session = await getSession();
   const supabase = await createClient();
 
-  const clients = (session?.tenants ?? []).filter((t) => !t.is_internal);
+  const accounts = (session?.tenants ?? []).filter((t) => !t.is_internal);
+  const prospects = accounts.filter((t) => t.status === 'prospect');
+  const clients = accounts.filter((t) => t.status !== 'prospect');
   const { count: serviceCount } = await supabase
     .from('service_catalog')
     .select('*', { count: 'exact', head: true })
@@ -16,7 +18,7 @@ export default async function ConsoleOverview() {
   const stats = [
     { label: 'Client accounts', value: clients.length },
     { label: 'Active', value: clients.filter((c) => c.status === 'active').length },
-    { label: 'Onboarding', value: clients.filter((c) => c.status === 'onboarding').length },
+    { label: 'Prospects', value: prospects.length },
     { label: 'Services in catalog', value: serviceCount ?? 0 },
   ];
 
