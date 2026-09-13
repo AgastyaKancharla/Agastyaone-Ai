@@ -43,3 +43,21 @@ export const BILLING_CYCLE_LABEL: Record<string, string> = {
   quarterly: 'Quarterly',
   annual: 'Annual',
 };
+
+export function CreditNoteStatusPill({ status }: { status: string }) {
+  const tone: Record<string, string> = {
+    draft: 'bg-hairline text-muted',
+    issued: 'bg-accent/10 text-accent-deep',
+    cancelled: 'bg-danger/10 text-danger',
+  };
+  return <span className={`pill ${tone[status] ?? 'bg-hairline text-muted'}`}>{status}</span>;
+}
+
+export const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  upi: 'UPI',
+  bank_transfer: 'Bank transfer',
+  cash: 'Cash',
+  cheque: 'Cheque',
+  card: 'Card',
+  other: 'Other',
+};

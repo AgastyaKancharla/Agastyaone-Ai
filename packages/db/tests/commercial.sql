@@ -126,19 +126,90 @@ select pg_temp.eq((select status from invoices where id = '10000000-0000-4000-80
 reset role;
 
 -- ===========================================================================
--- 3. Isolation: a client sees only their own clinic's contracts/invoices.
---    Neither table had a row-visibility test before this file.
+-- 3. Payments recompute an invoice's amount_received/status from scratch on
+--    every write, and credit notes get the same nullable/trigger-assigned
+--    number as invoices and contracts. Neither trigger existed before 0036.
+-- ===========================================================================
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"11111111-0000-4000-8000-000000000001","role":"authenticated"}', true);
+
+insert into invoices (id, tenant_id, issuer_tenant_id, status, issue_date, supplier_state_code, place_of_supply, taxable_amount, total_amount) values
+  ('10000000-0000-4000-8000-000000000003','aaaaaaaa-0000-4000-8000-000000000001',
+   (select id from tenants where is_internal limit 1),'draft', current_date, '29', '29', 10000, 10000);
+update invoices set status = 'issued' where id = '10000000-0000-4000-8000-000000000003';
+
+insert into payments (id, tenant_id, invoice_id, amount, received_on) values
+  ('20000000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000003', 4000, current_date);
+
+select pg_temp.eq((select amount_received from invoices where id = '10000000-0000-4000-8000-000000000003'), 4000::numeric,
+                  'payment: amount_received reflects a single partial payment');
+select pg_temp.eq((select status from invoices where id = '10000000-0000-4000-8000-000000000003'), 'part_paid',
+                  'payment: a partial payment moves the invoice to part_paid');
+
+insert into payments (id, tenant_id, invoice_id, amount, received_on) values
+  ('20000000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000003', 6000, current_date);
+
+select pg_temp.eq((select amount_received from invoices where id = '10000000-0000-4000-8000-000000000003'), 10000::numeric,
+                  'payment: amount_received sums every payment, not just the latest');
+select pg_temp.eq((select status from invoices where id = '10000000-0000-4000-8000-000000000003'), 'paid',
+                  'payment: reaching the full total moves the invoice to paid');
+
+delete from payments where id = '20000000-0000-4000-8000-000000000002';
+
+select pg_temp.eq((select amount_received from invoices where id = '10000000-0000-4000-8000-000000000003'), 4000::numeric,
+                  'payment: deleting a payment recomputes amount_received, not just decrements it');
+select pg_temp.eq((select status from invoices where id = '10000000-0000-4000-8000-000000000003'), 'part_paid',
+                  'payment: deleting the payment that completed it reverts the invoice to part_paid');
+
+insert into credit_notes (id, tenant_id, issuer_tenant_id, invoice_id, reason, status, issue_date, taxable_amount, cgst_amount, sgst_amount, total_amount) values
+  ('30000000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001',
+   (select id from tenants where is_internal limit 1), '10000000-0000-4000-8000-000000000003',
+   'Test correction', 'draft', current_date, 2000, 180, 180, 2360);
+
+select pg_temp.eq((select credit_note_number from credit_notes where id = '30000000-0000-4000-8000-000000000001'), null::text,
+                  'credit note: draft has no number yet');
+
+update credit_notes set status = 'issued' where id = '30000000-0000-4000-8000-000000000001';
+
+select pg_temp.eq((select credit_note_number is not null from credit_notes where id = '30000000-0000-4000-8000-000000000001'), true,
+                  'credit note: number assigned on draft -> issued');
+select pg_temp.eq((select credit_note_number like 'CRE/%' from credit_notes where id = '30000000-0000-4000-8000-000000000001'), true,
+                  'credit note: number carries the CRE prefix');
+select pg_temp.eq((select issued_at is not null from credit_notes where id = '30000000-0000-4000-8000-000000000001'), true,
+                  'credit note: issued_at set in the same trigger');
+
+create temp table _cn_capture (credit_note_number text) on commit drop;
+insert into _cn_capture select credit_note_number from credit_notes where id = '30000000-0000-4000-8000-000000000001';
+
+update credit_notes set status = 'cancelled' where id = '30000000-0000-4000-8000-000000000001';
+
+select pg_temp.eq((select credit_note_number from credit_notes where id = '30000000-0000-4000-8000-000000000001'),
+                  (select credit_note_number from _cn_capture),
+                  'credit note: number is untouched by a later status change (issued -> cancelled)');
+
+reset role;
+
+-- ===========================================================================
+-- 4. Isolation: a client sees only their own clinic's contracts/invoices/
+--    payments/credit notes. None of the four had a row-visibility test
+--    before this file.
 -- ===========================================================================
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"33333333-0000-4000-8000-000000000003","role":"authenticated"}', true);
 select pg_temp.eq((select count(*)::int from contracts), 1, 'client A: sees their own clinic''s one contract');
-select pg_temp.eq((select count(*)::int from invoices), 2, 'client A: sees their own clinic''s two invoices');
+select pg_temp.eq((select count(*)::int from invoices), 3, 'client A: sees their own clinic''s three invoices');
+select pg_temp.eq((select count(*)::int from payments), 1, 'client A: sees their own clinic''s one remaining payment');
+select pg_temp.eq((select count(*)::int from credit_notes), 1, 'client A: sees their own clinic''s one credit note');
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"44444444-0000-4000-8000-000000000004","role":"authenticated"}', true);
 select pg_temp.eq((select count(*)::int from contracts), 0, 'client B: sees none of clinic A''s contracts');
 select pg_temp.eq((select count(*)::int from invoices), 0, 'client B: sees none of clinic A''s invoices');
+select pg_temp.eq((select count(*)::int from payments), 0, 'client B: sees none of clinic A''s payments');
+select pg_temp.eq((select count(*)::int from credit_notes), 0, 'client B: sees none of clinic A''s credit notes');
 reset role;
 
 -- ===========================================================================

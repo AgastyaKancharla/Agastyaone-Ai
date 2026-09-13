@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeInvoice, computeInvoiceLine } from '../src/compute.ts';
-import type { BillableLine } from '../src/types.ts';
+import { computeCreditNote, computeInvoice, computeInvoiceLine } from '../src/compute.ts';
+import type { BillableLine, InvoiceTaxSnapshot } from '../src/types.ts';
 
 function line(overrides: Partial<BillableLine> = {}): BillableLine {
   return {
@@ -89,4 +89,37 @@ test('a header-level interstate flag drives every line -- no line computes its o
   assert.equal(totals.cgstAmount, 0);
   assert.equal(totals.sgstAmount, 0);
   assert.equal(totals.igstAmount, 1800 * 2);
+});
+
+function invoiceSnapshot(overrides: Partial<InvoiceTaxSnapshot> = {}): InvoiceTaxSnapshot {
+  return { taxableAmount: 10000, cgstAmount: 900, sgstAmount: 900, igstAmount: 0, ...overrides };
+}
+
+test('crediting the full taxable amount reproduces the invoice totals exactly', () => {
+  const r = computeCreditNote(invoiceSnapshot(), 10000);
+  assert.equal(r.taxableAmount, 10000);
+  assert.equal(r.cgstAmount, 900);
+  assert.equal(r.sgstAmount, 900);
+  assert.equal(r.totalAmount, 11800);
+});
+
+test('a partial credit scales every tax bucket by the same ratio, not a flat share', () => {
+  const r = computeCreditNote(invoiceSnapshot(), 4000);
+  assert.equal(r.taxableAmount, 4000);
+  assert.equal(r.cgstAmount, 360);
+  assert.equal(r.sgstAmount, 360);
+  assert.equal(r.totalAmount, 4720);
+});
+
+test('an interstate invoice credits IGST only, matching how it was originally charged', () => {
+  const r = computeCreditNote(invoiceSnapshot({ cgstAmount: 0, sgstAmount: 0, igstAmount: 1800 }), 10000);
+  assert.equal(r.cgstAmount, 0);
+  assert.equal(r.sgstAmount, 0);
+  assert.equal(r.igstAmount, 1800);
+});
+
+test('a zero-taxable invoice credits to zero rather than dividing by zero', () => {
+  const r = computeCreditNote(invoiceSnapshot({ taxableAmount: 0, cgstAmount: 0, sgstAmount: 0 }), 0);
+  assert.equal(r.taxableAmount, 0);
+  assert.equal(r.totalAmount, 0);
 });
