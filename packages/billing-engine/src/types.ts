@@ -41,3 +41,19 @@ export interface ComputedInvoice {
   lines: ComputedInvoiceLine[];
   totals: InvoiceTotals;
 }
+
+/** The parts of an issued invoice a credit note's tax split scales from. */
+export interface InvoiceTaxSnapshot {
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+}
+
+export interface ComputedCreditNote {
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalAmount: number;
+}

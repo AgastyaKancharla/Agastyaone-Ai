@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { computeInvoice, type BillableLine } from '@agastyaone/billing-engine';
+import { computeCreditNote, computeInvoice, type BillableLine } from '@agastyaone/billing-engine';
 
 export type InvoiceState = { error?: string; ok?: string };
 
@@ -153,5 +153,150 @@ export async function updateInvoiceStatus(formData: FormData): Promise<void> {
   await supabase.from('invoices').update({ status: nextStatus }).eq('id', invoiceId);
 
   revalidatePath(`/console/clients/${tenantId}/invoices`);
+  revalidatePath(`/console/clients/${tenantId}/invoices/${invoiceId}`);
+}
+
+/**
+ * Payments are never edited here -- the invoice's amount_received and status
+ * are recomputed from the full set of payments by a DB trigger
+ * (app.recalculate_invoice_payment_status, 0036), so recording one is a
+ * plain insert with no local bookkeeping to keep in sync.
+ */
+export async function recordPayment(_prev: InvoiceState, formData: FormData): Promise<InvoiceState> {
+  const tenantId = String(formData.get('tenant_id') ?? '');
+  const invoiceId = String(formData.get('invoice_id') ?? '');
+  const amount = Number(formData.get('amount') ?? 0);
+  const tdsAmount = Number(formData.get('tds_amount') ?? 0);
+  const method = String(formData.get('method') ?? 'upi');
+  const reference = String(formData.get('reference') ?? '').trim();
+  const receivedOn = String(formData.get('received_on') ?? '').trim() || new Date().toISOString().slice(0, 10);
+  const notes = String(formData.get('notes') ?? '').trim();
+
+  if (!Number.isFinite(amount) || amount <= 0) return { error: 'Enter a payment amount greater than zero.' };
+  if (!Number.isFinite(tdsAmount) || tdsAmount < 0) return { error: 'TDS amount must be zero or more.' };
+
+  const supabase = await createClient();
+
+  const { data: invoice } = await supabase.from('invoices').select('status').eq('id', invoiceId).maybeSingle();
+  if (!invoice || !['issued', 'part_paid'].includes(invoice.status)) {
+    return { error: 'Payments can only be recorded against an issued invoice.' };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from('payments').insert({
+    tenant_id: tenantId,
+    invoice_id: invoiceId,
+    amount,
+    tds_amount: tdsAmount,
+    method,
+    reference: reference || null,
+    received_on: receivedOn,
+    notes: notes || null,
+    recorded_by: user?.id ?? null,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/console/clients/${tenantId}/invoices`);
+  revalidatePath(`/console/clients/${tenantId}/invoices/${invoiceId}`);
+  return { ok: 'Payment recorded.' };
+}
+
+/**
+ * Scales the invoice's own tax breakdown down to the credited portion
+ * (@agastyaone/billing-engine's computeCreditNote) rather than re-deriving
+ * GST -- correct even when the invoice mixed line items at different rates.
+ * Starts as a draft, same as a contract or invoice: credit_note_number is
+ * assigned by app.assign_credit_note_number (0036) only once this is marked
+ * issued.
+ */
+export async function issueCreditNote(_prev: InvoiceState, formData: FormData): Promise<InvoiceState> {
+  const tenantId = String(formData.get('tenant_id') ?? '');
+  const invoiceId = String(formData.get('invoice_id') ?? '');
+  const reason = String(formData.get('reason') ?? '').trim();
+  const creditTaxableAmount = Number(formData.get('taxable_amount') ?? 0);
+
+  if (!reason) return { error: 'Say why this invoice is being credited.' };
+  if (!Number.isFinite(creditTaxableAmount) || creditTaxableAmount <= 0) {
+    return { error: 'Enter a taxable amount to credit, greater than zero.' };
+  }
+
+  const supabase = await createClient();
+
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, issuer_tenant_id, status, issue_date, taxable_amount, cgst_amount, sgst_amount, igst_amount')
+    .eq('id', invoiceId)
+    .maybeSingle();
+
+  if (!invoice || !['issued', 'part_paid', 'paid'].includes(invoice.status)) {
+    return { error: 'Only an issued invoice can be credited.' };
+  }
+
+  const { data: existingCredits } = await supabase
+    .from('credit_notes')
+    .select('taxable_amount')
+    .eq('invoice_id', invoiceId)
+    .neq('status', 'cancelled');
+
+  const alreadyCredited = (existingCredits ?? []).reduce((sum, c) => sum + Number(c.taxable_amount), 0);
+  const remaining = Number(invoice.taxable_amount) - alreadyCredited;
+
+  if (creditTaxableAmount > remaining + 0.01) {
+    return { error: `This invoice has at most ${remaining.toFixed(2)} left to credit.` };
+  }
+
+  const computed = computeCreditNote(
+    {
+      taxableAmount: Number(invoice.taxable_amount),
+      cgstAmount: Number(invoice.cgst_amount),
+      sgstAmount: Number(invoice.sgst_amount),
+      igstAmount: Number(invoice.igst_amount),
+    },
+    creditTaxableAmount,
+  );
+
+  const { error } = await supabase.from('credit_notes').insert({
+    tenant_id: tenantId,
+    issuer_tenant_id: invoice.issuer_tenant_id,
+    invoice_id: invoiceId,
+    reason,
+    status: 'draft',
+    issue_date: new Date().toISOString().slice(0, 10),
+    taxable_amount: computed.taxableAmount,
+    cgst_amount: computed.cgstAmount,
+    sgst_amount: computed.sgstAmount,
+    igst_amount: computed.igstAmount,
+    total_amount: computed.totalAmount,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/console/clients/${tenantId}/invoices/${invoiceId}`);
+  return { ok: 'Credit note drafted.' };
+}
+
+const CREDIT_NOTE_NEXT_STATUS: Record<string, string[]> = {
+  draft: ['issued'],
+  issued: ['cancelled'],
+};
+
+export async function updateCreditNoteStatus(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get('tenant_id') ?? '');
+  const invoiceId = String(formData.get('invoice_id') ?? '');
+  const creditNoteId = String(formData.get('credit_note_id') ?? '');
+  const currentStatus = String(formData.get('current_status') ?? '');
+  const nextStatus = String(formData.get('next_status') ?? '');
+
+  if (!CREDIT_NOTE_NEXT_STATUS[currentStatus]?.includes(nextStatus)) {
+    throw new Error(`Cannot move a credit note from ${currentStatus} to ${nextStatus}.`);
+  }
+
+  const supabase = await createClient();
+  await supabase.from('credit_notes').update({ status: nextStatus }).eq('id', creditNoteId);
+
   revalidatePath(`/console/clients/${tenantId}/invoices/${invoiceId}`);
 }

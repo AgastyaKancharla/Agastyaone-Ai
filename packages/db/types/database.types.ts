@@ -1821,7 +1821,7 @@ export type Database = {
         Row: {
           cgst_amount: number
           created_at: string
-          credit_note_number: string
+          credit_note_number: string | null
           document_id: string | null
           id: string
           igst_amount: number
@@ -1840,7 +1840,7 @@ export type Database = {
         Insert: {
           cgst_amount?: number
           created_at?: string
-          credit_note_number: string
+          credit_note_number?: string | null
           document_id?: string | null
           id?: string
           igst_amount?: number
@@ -1859,7 +1859,7 @@ export type Database = {
         Update: {
           cgst_amount?: number
           created_at?: string
-          credit_note_number?: string
+          credit_note_number?: string | null
           document_id?: string | null
           id?: string
           igst_amount?: number

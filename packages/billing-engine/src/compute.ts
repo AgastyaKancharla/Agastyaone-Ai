@@ -1,4 +1,11 @@
-import type { BillableLine, ComputedInvoice, ComputedInvoiceLine, InvoiceTotals } from './types.ts';
+import type {
+  BillableLine,
+  ComputedCreditNote,
+  ComputedInvoice,
+  ComputedInvoiceLine,
+  InvoiceTaxSnapshot,
+  InvoiceTotals,
+} from './types.ts';
 
 /**
  * Rounds to the paisa, the same precision `numeric(14,2)` holds in Postgres --
@@ -84,4 +91,31 @@ export function computeInvoice(lines: BillableLine[], isInterstate: boolean): Co
   };
 
   return { lines: computedLines, totals };
+}
+
+/**
+ * A credit note scales an already-issued invoice's tax breakdown down to the
+ * portion being credited, rather than re-deriving GST from scratch. That
+ * matters because an invoice can mix line items at different GST rates --
+ * scaling every tax bucket by the same ratio credits back exactly what was
+ * actually charged, without needing to reopen which lines it came from.
+ *
+ * `creditTaxableAmount` is assumed already validated by the caller as
+ * `<=` whatever of the invoice remains uncredited; this function only does
+ * the arithmetic.
+ */
+export function computeCreditNote(invoice: InvoiceTaxSnapshot, creditTaxableAmount: number): ComputedCreditNote {
+  const ratio = invoice.taxableAmount > 0 ? creditTaxableAmount / invoice.taxableAmount : 0;
+  const taxableAmount = round2(creditTaxableAmount);
+  const cgstAmount = round2(invoice.cgstAmount * ratio);
+  const sgstAmount = round2(invoice.sgstAmount * ratio);
+  const igstAmount = round2(invoice.igstAmount * ratio);
+
+  return {
+    taxableAmount,
+    cgstAmount,
+    sgstAmount,
+    igstAmount,
+    totalAmount: round2(taxableAmount + cgstAmount + sgstAmount + igstAmount),
+  };
 }

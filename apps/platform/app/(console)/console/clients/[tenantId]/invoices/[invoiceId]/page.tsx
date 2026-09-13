@@ -2,12 +2,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/shell';
-import { InvoiceStatusPill } from '@/components/commercial';
+import { CreditNoteStatusPill, InvoiceStatusPill, PAYMENT_METHOD_LABEL } from '@/components/commercial';
 import { formatINR, stateName } from '@/lib/india';
-import { updateInvoiceStatus } from '../actions';
+import { updateCreditNoteStatus, updateInvoiceStatus } from '../actions';
+import { IssueCreditNoteForm, RecordPaymentForm } from './forms';
 
 const NEXT_STATUS: Record<string, { to: string; label: string; tone?: 'danger' }[]> = {
   draft: [{ to: 'issued', label: 'Mark issued' }],
+  issued: [{ to: 'cancelled', label: 'Cancel', tone: 'danger' }],
+};
+
+const CREDIT_NOTE_NEXT_STATUS: Record<string, { to: string; label: string; tone?: 'danger' }[]> = {
+  draft: [{ to: 'issued', label: 'Issue' }],
   issued: [{ to: 'cancelled', label: 'Cancel', tone: 'danger' }],
 };
 
@@ -33,15 +39,33 @@ export default async function InvoiceDetailPage({
 
   if (!invoice || invoice.tenant_id !== tenantId) notFound();
 
-  const { data: lines } = await supabase
-    .from('invoice_lines')
-    .select('id, description, hsn_sac_code, quantity, unit_price, discount_amount, taxable_amount, gst_rate, cgst_amount, sgst_amount, igst_amount, line_total, period_start, period_end')
-    .eq('invoice_id', invoiceId)
-    .order('sort_order');
+  const [{ data: lines }, { data: payments }, { data: creditNotes }] = await Promise.all([
+    supabase
+      .from('invoice_lines')
+      .select('id, description, hsn_sac_code, quantity, unit_price, discount_amount, taxable_amount, gst_rate, cgst_amount, sgst_amount, igst_amount, line_total, period_start, period_end')
+      .eq('invoice_id', invoiceId)
+      .order('sort_order'),
+    supabase
+      .from('payments')
+      .select('id, amount, tds_amount, method, reference, received_on, notes')
+      .eq('invoice_id', invoiceId)
+      .order('received_on', { ascending: false }),
+    supabase
+      .from('credit_notes')
+      .select('id, credit_note_number, reason, status, issue_date, taxable_amount, total_amount')
+      .eq('invoice_id', invoiceId)
+      .order('created_at', { ascending: false }),
+  ]);
 
   const nextSteps = NEXT_STATUS[invoice.status] ?? [];
   const contract = invoice.contracts as { id: string; reference: string | null; title: string } | null;
-  const expectedReceipt = Number(invoice.total_amount) - Number(invoice.tds_amount);
+  const balanceDue = Number(invoice.total_amount) - Number(invoice.amount_received);
+  const canRecordPayment = ['issued', 'part_paid'].includes(invoice.status);
+  const canIssueCreditNote = ['issued', 'part_paid', 'paid'].includes(invoice.status);
+  const alreadyCredited = (creditNotes ?? [])
+    .filter((c) => c.status !== 'cancelled')
+    .reduce((sum, c) => sum + Number(c.taxable_amount), 0);
+  const remainingCreditable = Number(invoice.taxable_amount) - alreadyCredited;
 
   return (
     <>
@@ -91,8 +115,10 @@ export default async function InvoiceDetailPage({
             </div>
           </div>
           <div className="card p-5">
-            <div className="text-3xl font-semibold tabular-nums">{formatINR(expectedReceipt)}</div>
-            <div className="text-sm text-muted mt-1">Expected receipt{Number(invoice.tds_amount) > 0 ? ' (after TDS)' : ''}</div>
+            <div className="text-3xl font-semibold tabular-nums">{formatINR(balanceDue > 0 ? balanceDue : 0)}</div>
+            <div className="text-sm text-muted mt-1">
+              Balance due{Number(invoice.amount_received) > 0 ? ` · ${formatINR(invoice.amount_received)} received` : ''}
+            </div>
           </div>
         </div>
 
@@ -159,6 +185,97 @@ export default async function InvoiceDetailPage({
               ))}
             </tbody>
           </table>
+        </section>
+
+        <section className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-hairline">
+            <h2 className="font-medium">Payments</h2>
+            <p className="hint">Amount received and status above are recomputed from these automatically.</p>
+          </div>
+          {(payments ?? []).length > 0 && (
+            <ul className="divide-y divide-hairline">
+              {(payments ?? []).map((p) => (
+                <li key={p.id} className="px-6 py-3 flex items-center justify-between gap-4 text-sm">
+                  <div>
+                    <span className="font-medium tabular-nums">{formatINR(p.amount)}</span>
+                    <span className="text-muted"> · {PAYMENT_METHOD_LABEL[p.method] ?? p.method}</span>
+                    {p.reference && <span className="text-muted font-mono text-xs"> · {p.reference}</span>}
+                    {Number(p.tds_amount) > 0 && (
+                      <span className="text-muted text-xs"> · {formatINR(p.tds_amount)} TDS</span>
+                    )}
+                  </div>
+                  <span className="text-muted text-xs">
+                    {new Date(p.received_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canRecordPayment ? (
+            <div className="px-6 py-5 border-t border-hairline">
+              <RecordPaymentForm tenantId={tenantId} invoiceId={invoiceId} />
+            </div>
+          ) : (
+            (payments ?? []).length === 0 && (
+              <p className="px-6 py-6 text-sm text-muted">
+                {invoice.status === 'draft' ? 'Mark this invoice issued before recording a payment.' : 'No payments recorded.'}
+              </p>
+            )
+          )}
+        </section>
+
+        <section className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-hairline">
+            <h2 className="font-medium">Credit notes</h2>
+            <p className="hint">Corrects an issued invoice without editing it. The invoice&rsquo;s own total never changes.</p>
+          </div>
+          {(creditNotes ?? []).length > 0 && (
+            <ul className="divide-y divide-hairline">
+              {(creditNotes ?? []).map((c) => {
+                const cnSteps = CREDIT_NOTE_NEXT_STATUS[c.status] ?? [];
+                return (
+                  <li key={c.id} className="px-6 py-3 flex items-center justify-between gap-4 text-sm">
+                    <div>
+                      <span className="font-mono text-xs text-muted">{c.credit_note_number ?? 'unissued'}</span>
+                      <span className="font-medium tabular-nums ml-2">{formatINR(c.total_amount)}</span>
+                      <div className="text-muted text-xs">{c.reason}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <CreditNoteStatusPill status={c.status} />
+                      {cnSteps.map((step) => (
+                        <form key={step.to} action={updateCreditNoteStatus}>
+                          <input type="hidden" name="tenant_id" value={tenantId} />
+                          <input type="hidden" name="invoice_id" value={invoiceId} />
+                          <input type="hidden" name="credit_note_id" value={c.id} />
+                          <input type="hidden" name="current_status" value={c.status} />
+                          <input type="hidden" name="next_status" value={step.to} />
+                          <button
+                            type="submit"
+                            className={step.tone === 'danger' ? 'text-xs text-muted hover:text-danger' : 'text-xs text-brand hover:underline'}
+                          >
+                            {step.label}
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {canIssueCreditNote && remainingCreditable > 0 ? (
+            <div className="px-6 py-5 border-t border-hairline">
+              <IssueCreditNoteForm tenantId={tenantId} invoiceId={invoiceId} remaining={remainingCreditable} />
+            </div>
+          ) : (
+            (creditNotes ?? []).length === 0 && (
+              <p className="px-6 py-6 text-sm text-muted">
+                {invoice.status === 'draft'
+                  ? 'Mark this invoice issued before crediting it.'
+                  : 'This invoice has already been fully credited.'}
+              </p>
+            )
+          )}
         </section>
 
         <p className="text-sm text-muted">
