@@ -198,9 +198,6 @@ export default async function LocationMapRankPage({
                 {scanRivals.length > 0 && (
                   <div>
                     <h3 className="font-medium text-sm">Who is winning this grid</h3>
-                    <p className="hint mb-2">
-                      Staff only — the client&rsquo;s Portal shows their own ranking without naming rivals.
-                    </p>
                     <table className="w-full">
                       <thead className="bg-brand-wash border-b border-hairline">
                         <tr>

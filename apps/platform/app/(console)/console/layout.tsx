@@ -13,9 +13,9 @@ const nav: NavItem[] = [
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect('/sign-in');
-  // A client who guesses the URL is bounced to their own workspace. RLS would
-  // return nothing here anyway; this just avoids showing them an empty Console.
-  if (session.workspace !== 'console') redirect('/portal');
+  // A client who guesses the URL is bounced away. RLS would return nothing here
+  // anyway; this just avoids showing them an empty Console.
+  if (session.workspace !== 'console') redirect('/');
 
   return (
     <Shell

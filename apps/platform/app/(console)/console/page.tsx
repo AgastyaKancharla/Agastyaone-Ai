@@ -41,8 +41,8 @@ export default async function ConsoleOverview() {
             <h2 className="font-medium">Add your first client</h2>
             <p className="hint max-w-lg mt-2">
               Nothing is seeded — real names, branches and GST details should come from you,
-              not from a guess. Adding a client creates their account, their first location
-              and the portal they will sign into.
+              not from a guess. Adding a client creates their account and their first
+              location.
             </p>
             <Link href="/console/clients/new" className="btn-primary mt-6">
               Add a client

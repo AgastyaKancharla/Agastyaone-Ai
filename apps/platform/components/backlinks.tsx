@@ -1,4 +1,4 @@
-/** Shared presentation for the backlinks pillar, used by the Console and the Portal. */
+/** Presentation for the backlinks pillar. */
 
 export function BacklinksSummaryTiles({
   score,

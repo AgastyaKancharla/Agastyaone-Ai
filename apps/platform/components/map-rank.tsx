@@ -1,4 +1,4 @@
-/** Shared presentation for geo-grid map rank, used by the Console and the Portal. */
+/** Presentation for the geo-grid map rank heatmap. */
 
 export type HeatPoint = {
   idx: number;

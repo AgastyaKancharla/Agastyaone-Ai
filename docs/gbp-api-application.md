@@ -176,8 +176,8 @@ what is true on the day.
 
 ## What is true today, without any of this
 
-- The live rating and recent reviews appear in the Console and the Portal as soon
-  as Track A is done and a place ID is set.
+- The live rating and recent reviews appear in the Console as soon as Track A
+  is done and a place ID is set.
 - Review requests work now: a QR code at the front desk, the scan recorded,
   the funnel reported. No Google approval, no Meta approval, no TRAI/DLT
   registration.
