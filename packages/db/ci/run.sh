@@ -61,6 +61,9 @@ $PSQL -f packages/db/tests/geo_visibility.sql || die "geo visibility failed"
 step "Backlinks"
 $PSQL -f packages/db/tests/backlinks.sql || die "backlinks failed"
 
+step "Commercial"
+$PSQL -f packages/db/tests/commercial.sql || die "commercial failed"
+
 # ---------------------------------------------------------------------------
 # A guard that has never failed is not known to work. Each case below breaks
 # exactly one invariant and asserts the guards catch THAT one, then repairs it

@@ -2789,7 +2789,7 @@ export type Database = {
           due_date: string | null
           id: string
           igst_amount: number
-          invoice_number: string
+          invoice_number: string | null
           is_interstate: boolean
           issue_date: string
           issued_at: string | null
@@ -2820,7 +2820,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           igst_amount?: number
-          invoice_number: string
+          invoice_number?: string | null
           is_interstate?: boolean
           issue_date?: string
           issued_at?: string | null
@@ -2851,7 +2851,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           igst_amount?: number
-          invoice_number?: string
+          invoice_number?: string | null
           is_interstate?: boolean
           issue_date?: string
           issued_at?: string | null

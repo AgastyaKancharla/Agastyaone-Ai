@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agastyaone/billing-engine": "*",
     "@agastyaone/db": "*",
     "@agastyaone/places-client": "*",
     "@supabase/ssr": "^0.12.6",
