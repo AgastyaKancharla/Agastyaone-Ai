@@ -30,26 +30,31 @@ export async function createTenant(_prev: CreateState, formData: FormData): Prom
 
   const supabase = await createClient();
 
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .insert({
-      name,
-      slug: slugify(name),
-      legal_name: String(formData.get('legal_name') ?? '').trim() || null,
-      vertical,
-      status: 'onboarding',
-      place_of_supply: placeOfSupply,
-      gstin: gstin || null,
-      billing_email: billingEmail || null,
-    })
-    .select('id')
-    .single();
+  // Generated here rather than left to the column default, and the insert
+  // below deliberately has no .select(): RLS's SELECT policy for 'all'-scope
+  // staff computes accessible tenant ids by querying tenants itself, and a
+  // row this same INSERT just created is not yet visible to that check when
+  // Postgres re-evaluates it for a RETURNING clause -- the write succeeds,
+  // reading the just-written row back in the same statement does not.
+  // Already knowing the id sidesteps that instead of fighting it.
+  const tenantId = crypto.randomUUID();
+  const { error: tenantError } = await supabase.from('tenants').insert({
+    id: tenantId,
+    name,
+    slug: slugify(name),
+    legal_name: String(formData.get('legal_name') ?? '').trim() || null,
+    vertical,
+    status: 'onboarding',
+    place_of_supply: placeOfSupply,
+    gstin: gstin || null,
+    billing_email: billingEmail || null,
+  });
 
-  if (tenantError || !tenant) {
+  if (tenantError) {
     return {
-      error: tenantError?.code === '23505'
+      error: tenantError.code === '23505'
         ? 'An account with a very similar name already exists.'
-        : tenantError?.message ?? 'Could not create the account.',
+        : tenantError.message,
     };
   }
 
@@ -68,7 +73,7 @@ export async function createTenant(_prev: CreateState, formData: FormData): Prom
 
   if (staff) {
     await supabase.from('account_assignments').insert({
-      tenant_id: tenant.id,
+      tenant_id: tenantId,
       staff_id: staff.id,
       role: 'account_manager',
       status: 'active',
@@ -77,7 +82,7 @@ export async function createTenant(_prev: CreateState, formData: FormData): Prom
 
   if (locationName || city) {
     const { error: locError } = await supabase.from('tenant_locations').insert({
-      tenant_id: tenant.id,
+      tenant_id: tenantId,
       name: locationName || `${name} — main`,
       is_primary: true,
       address_line1: addressLine1 || null,
@@ -89,10 +94,10 @@ export async function createTenant(_prev: CreateState, formData: FormData): Prom
     // The account exists either way; a failed location is recoverable from the
     // detail page, so this does not roll the whole thing back.
     if (locError) {
-      redirect(`/console/clients/${tenant.id}?warn=location`);
+      redirect(`/console/clients/${tenantId}?warn=location`);
     }
   }
 
   revalidatePath('/console/clients');
-  redirect(`/console/clients/${tenant.id}`);
+  redirect(`/console/clients/${tenantId}`);
 }

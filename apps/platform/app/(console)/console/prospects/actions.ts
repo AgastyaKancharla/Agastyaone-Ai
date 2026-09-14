@@ -39,17 +39,23 @@ export async function createProspect(_prev: ProspectState, formData: FormData): 
   const supabase = await createClient();
   const notes: string[] = [];
 
-  const { data: tenant, error: tenantError } = await supabase
+  // Generated here rather than left to the column default, and the insert
+  // below deliberately has no .select(): RLS's SELECT policy for 'all'-scope
+  // staff computes accessible tenant ids by querying tenants itself, and a
+  // row this same INSERT just created is not yet visible to that check when
+  // Postgres re-evaluates it for a RETURNING clause -- the write succeeds,
+  // reading the just-written row back in the same statement does not.
+  // Already knowing the id sidesteps that instead of fighting it.
+  const tenantId = crypto.randomUUID();
+  const { error: tenantError } = await supabase
     .from('tenants')
-    .insert({ name, slug: slugify(name), vertical, status: 'prospect', place_of_supply: '29' })
-    .select('id')
-    .single();
+    .insert({ id: tenantId, name, slug: slugify(name), vertical, status: 'prospect', place_of_supply: '29' });
 
-  if (tenantError || !tenant) {
+  if (tenantError) {
     return {
-      error: tenantError?.code === '23505'
+      error: tenantError.code === '23505'
         ? 'A business with a very similar name is already tracked.'
-        : tenantError?.message ?? 'Could not create the prospect.',
+        : tenantError.message,
     };
   }
 
@@ -62,7 +68,7 @@ export async function createProspect(_prev: ProspectState, formData: FormData): 
     .maybeSingle();
   if (staff) {
     await supabase.from('account_assignments').insert({
-      tenant_id: tenant.id,
+      tenant_id: tenantId,
       staff_id: staff.id,
       role: 'account_manager',
       status: 'active',
@@ -72,7 +78,7 @@ export async function createProspect(_prev: ProspectState, formData: FormData): 
   const { data: location, error: locationError } = await supabase
     .from('tenant_locations')
     .insert({
-      tenant_id: tenant.id,
+      tenant_id: tenantId,
       name: `${name} — main`,
       is_primary: true,
       address_line1: addressLine1 || null,
@@ -129,19 +135,19 @@ export async function createProspect(_prev: ProspectState, formData: FormData): 
   const defaultQuestion = city ? `best ${noun} in ${city}` : `best ${noun}`;
 
   await supabase.from('map_keywords').insert({
-    tenant_id: tenant.id,
+    tenant_id: tenantId,
     location_id: locationId,
     phrase: searchPhrase || defaultSearch,
   });
 
   await supabase.from('geo_prompts').insert({
-    tenant_id: tenant.id,
+    tenant_id: tenantId,
     location_id: locationId,
     prompt: question || defaultQuestion,
   });
 
   revalidatePath('/console/prospects');
-  redirect(`/console/prospects/${tenant.id}${notes.length ? `?note=${encodeURIComponent(notes.join(' '))}` : ''}`);
+  redirect(`/console/prospects/${tenantId}${notes.length ? `?note=${encodeURIComponent(notes.join(' '))}` : ''}`);
 }
 
 /**
